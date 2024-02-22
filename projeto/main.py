@@ -1,21 +1,15 @@
-# %% Graficos para visualizar dados
+
 import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
 
+class DataAnalysis:
+    def __init__(self, dataset, labels, column_names):
+        self.df = None
+        self.df_labels = None
+        self.dataset = dataset
+        self.labels = labels
 
-def disease_countplots(data):
-    # Criar um conjunto de subplots
-    fig, axes = plt.subplots(nrows=data.shape[1], ncols=1, figsize=(20, 13 * data.shape[1]))
-    for i in range(len(data.columns)):
-        col = data.columns[i]
-        sns.countplot(x=col, data=data, hue="HeartDisease", palette="seismic", ax=axes[i])
-    axes[0].legend([])
-    plt.show()
+        self.df
 
 
-df = pd.read_csv('data/heart_2020_cleaned.csv')
-
-df.info()
-
-disease_countplots(df)
