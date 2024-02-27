@@ -106,10 +106,13 @@ class DataAnalysis:
         self.df["SkinCancer"] = self.df["SkinCancer"].map({"No": 0, "Yes": 1})
 
         print("\nProcessed Dataset:")
-        print(self.df)
         print(self.df.info())
 
     def assess_quality(self):
+
+        print("\nOriginal Dataset:")
+        print(self.df.info)
+
         print("Missing values:\n", self.df.isnull().sum())
         print("Duplicate Rows:", self.df.duplicated().sum())
         print("\nDetecting outliers:")
@@ -122,17 +125,21 @@ class DataAnalysis:
             outliers = self.df[(self.df[feature] < lower_bound) | (self.df[feature] > upper_bound)]
             print(f"Outliers in '{feature}':\n{outliers}" if not outliers.empty else f"No outliers in '{feature}'.")
 
-            # Remove outliers
+            # Replace outliers with median value
+            median_value = self.df[feature].median()
             self.df[feature] = np.where(
                 (self.df[feature] < lower_bound) | (self.df[feature] > upper_bound),
-                np.nan,
+                median_value,
                 self.df[feature]
             )
 
         if self.df.duplicated().sum() > 0:
             self.df = self.df.drop_duplicates(keep='first')
 
-        #self.df.to_csv('data/heart_2020_cleaned.csv', encoding='utf-8', index=False)
+        self.df.to_csv('data/heart_2020_cleaned.csv', encoding='utf-8', index=False)
+
+        print("\nCleansed Dataset:")
+        print(self.df.info)
 
     """
         1 -> severe thinness
@@ -167,4 +174,4 @@ data_analysis_instance.process_data()
 # Verify the presence of duplicated data and remove it
 data_analysis_instance.assess_quality()
 
-data_analysis_instance.count_plots()
+#data_analysis_instance.count_plots()
