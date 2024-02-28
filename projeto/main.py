@@ -19,7 +19,7 @@ class DataAnalysis:
         # Concatenate the labels to the dataset
         self.df_with_labels = pd.concat([self.df, self.labels], axis=1)
 
-        self.valid_plot_types = ['count', 'violin', 'box', 'scatter', 'lines', 'bar', 'lollypops', 'kde', 'correlation']
+        self.valid_plot_types = ['count', 'hist', 'kde', 'correlation', 'box']
 
     def describe_variables(self):
         print("\nInformation of Data:")
@@ -34,7 +34,7 @@ class DataAnalysis:
         print("\nRange of values for each variable:")
         print(self.df.max() - self.df.min())
 
-    def age_feature(self):
+    def age_category(self):
         age = self.df["AgeCategory"]
         condition = [
             age == "18-24", age == "25-29",
@@ -62,13 +62,13 @@ class DataAnalysis:
         bmi = self.df["BMI"]
         condition = [bmi < 16, bmi < 17, bmi < 18.5, bmi < 25, bmi < 30, bmi < 35, bmi < 40, bmi >= 40]
         choice = [1, 2, 3, 4, 5, 6, 7, 8]
-        self.df["BMI"] = np.select(condition, choice)
+        self.df["BMIClass"] = np.select(condition, choice)
 
     def sleep_feature(self):
         sleep = self.df["SleepTime"]
         condition = [sleep < 6, sleep < 9, sleep >= 9]
         choice = [1, 2, 3]
-        self.df["SleepTime"] = np.select(condition, choice)
+        self.df["SleepClass"] = np.select(condition, choice)
 
     def race_feature(self):
         race = self.df["Race"]
@@ -144,7 +144,7 @@ class DataAnalysis:
         if self.df.duplicated().sum() > 0:
             self.df = self.df.drop_duplicates(keep='first')
 
-        #data_analysis_instance.plots(['count', 'kde'])
+        data_analysis_instance.plots(['box', 'correlation', 'kde'])
 
         print("\nDetecting outliers:")
         for feature in self.df:
@@ -189,6 +189,11 @@ class DataAnalysis:
                     sns.countplot(x=feature, data=self.df, hue=self.target, ax=ax)
                     ax.set_title(f'Countplot of {feature} by {self.target}')
                     plt.show()
+                if plot_type == 'hist':
+                    fig, ax = plt.subplots(figsize=(8, 6))
+                    sns.histplot(x=feature, data=self.df, hue=self.target, ax=ax)
+                    ax.set_title(f'Histogram of {feature}')
+                    plt.show()
                 if plot_type == 'kde' and feature in ['BMI', 'SleepTime', 'PhysicalHealth', 'MenHealth']:
                     fig, ax = plt.subplots(figsize=(13, 5))
                     sns.kdeplot(self.df[self.df["HeartDisease"] == 1][feature], alpha=0.5, shade=True, color="red",
@@ -199,6 +204,11 @@ class DataAnalysis:
                     ax.set_xlabel(feature)
                     ax.set_ylabel("Frequency")
                     ax.legend()
+                    plt.show()
+                if plot_type == 'box' and feature not in ['HeartDisease', 'AlcoholDrinking', 'Stroke', 'Asthma', 'KidneyDisease', 'DiffWalking', 'Sex', 'Diabetic', 'PhysicalActivity', 'SkinCancer', 'Smoking',  self.target]:
+                    fig, ax = plt.subplots(figsize=(8, 6))
+                    sns.boxplot(x=self.target, y=feature, data=self.df, ax=ax)
+                    ax.set_title(f'Boxplot of {feature} by {self.target}')
                     plt.show()
 
         if 'correlation' in plot_types:
@@ -224,4 +234,4 @@ data_analysis_instance.determine_range()
 data_analysis_instance.assess_quality()
 
 # Plots after the cleansing
-data_analysis_instance.plots(['count', 'correlation'])
+#data_analysis_instance.plots(['box'])
