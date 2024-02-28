@@ -7,10 +7,19 @@ import matplotlib.pyplot as plt
 class DataAnalysis:
     def __init__(self, dataset_path, target):
         self.df = pd.read_csv(dataset_path)
-        self.labels = self.df.columns
         self.target = target
 
-        self.valid_plot_types = ['count', 'violin', 'box', 'scatter', 'lines', 'bar', 'lollypops']
+        # Validate if the target column exists in the dataset
+        if self.target not in self.df.columns:
+            raise ValueError(f"Target column '{self.target}' not found in the dataset.")
+
+        # Extract the labels from the target column
+        self.labels = self.df[self.target]
+
+        # Concatenate the labels to the dataset
+        self.df_with_labels = pd.concat([self.df, self.labels], axis=1)
+
+        self.valid_plot_types = ['count', 'violin', 'box', 'scatter', 'lines', 'bar', 'lollypops', 'kde', 'correlation']
 
     def describe_variables(self):
         print("\nInformation of Data:")
@@ -18,6 +27,12 @@ class DataAnalysis:
 
         print("\nStatistical distribution of each variable:")
         print(self.df.describe())
+
+    def determine_range(self):
+
+        # Display the range of values for each variable without considering the class label
+        print("\nRange of values for each variable:")
+        print(self.df.max() - self.df.min())
 
     def age_feature(self):
         age = self.df["AgeCategory"]
@@ -33,6 +48,16 @@ class DataAnalysis:
         choice = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13]
         self.df["AgeCategory"] = np.select(condition, choice, default=0)
 
+    """
+        1 -> severe thinness
+        2 -> moderate thinness
+        3 -> mild thinness
+        4 -> normal
+        5 -> overweight
+        6 -> obese class 1
+        7 -> obese class 2
+        8 -> obese class 3
+    """
     def bmi_feature(self):
         bmi = self.df["BMI"]
         condition = [bmi < 16, bmi < 17, bmi < 18.5, bmi < 25, bmi < 30, bmi < 35, bmi < 40, bmi >= 40]
@@ -88,7 +113,7 @@ class DataAnalysis:
         # Process features
         self.age_feature()
         self.bmi_feature()
-        self.sleep_feature()
+        #self.sleep_feature()
         self.race_feature()
         self.genhealth_feature()
 
@@ -115,6 +140,12 @@ class DataAnalysis:
 
         print("Missing values:\n", self.df.isnull().sum())
         print("Duplicate Rows:", self.df.duplicated().sum())
+
+        if self.df.duplicated().sum() > 0:
+            self.df = self.df.drop_duplicates(keep='first')
+
+        #data_analysis_instance.plots(['count', 'kde'])
+
         print("\nDetecting outliers:")
         for feature in self.df:
             q1 = self.df[feature].quantile(0.25)
@@ -125,6 +156,11 @@ class DataAnalysis:
             outliers = self.df[(self.df[feature] < lower_bound) | (self.df[feature] > upper_bound)]
             print(f"Outliers in '{feature}':\n{outliers}" if not outliers.empty else f"No outliers in '{feature}'.")
 
+            # Check if the feature is binary (0 or 1)
+            if set(self.df[feature]) == {0, 1}:
+                # Skip replacing outliers for binary features
+                continue
+
             # Replace outliers with median value
             median_value = self.df[feature].median()
             self.df[feature] = np.where(
@@ -133,36 +169,46 @@ class DataAnalysis:
                 self.df[feature]
             )
 
-        if self.df.duplicated().sum() > 0:
-            self.df = self.df.drop_duplicates(keep='first')
-
         self.df.to_csv('data/heart_2020_cleaned.csv', encoding='utf-8', index=False)
 
         print("\nCleansed Dataset:")
         print(self.df.info)
 
-    """
-        1 -> severe thinness
-        2 -> moderate thinness
-        3 -> mild thinness
-        4 -> normal
-        5 -> overweight
-        6 -> obese class 1
-        7 -> obese class 2
-        8 -> obese class 3
-    """
-
-    def count_plots(self):
-        for i in range(len(self.df.columns)):
-            column = self.df.columns[i]
-            if column == 'BMI' or column == 'HeartDisease':
+    def plots(self, plot_types):
+        for plot_type in plot_types:
+            # Check if the selected plots are in the list of available plots
+            if plot_type not in self.valid_plot_types:
+                print(
+                    f"Ignoring invalid plot type: {plot_type}. Supported plot types: {', '.join(self.valid_plot_types)}")
                 continue
-            else:
-                sns.countplot(x=column, data=self.df, hue=self.target)
-                plt.show()
+
+            for feature in self.df.columns:
+                # Create a figure with a single subplot for each feature
+                if plot_type == 'count' and feature not in ['BMI', 'SleepTime', 'PhysicalHealth', 'MenHealth', 'HeartDisease', self.target]:
+                    fig, ax = plt.subplots(figsize=(8, 6))
+                    sns.countplot(x=feature, data=self.df, hue=self.target, ax=ax)
+                    ax.set_title(f'Countplot of {feature} by {self.target}')
+                    plt.show()
+                if plot_type == 'kde' and feature in ['BMI', 'SleepTime', 'PhysicalHealth', 'MenHealth']:
+                    fig, ax = plt.subplots(figsize=(13, 5))
+                    sns.kdeplot(self.df[self.df["HeartDisease"] == 1][feature], alpha=0.5, shade=True, color="red",
+                                label="HeartDisease", ax=ax)
+                    sns.kdeplot(self.df[self.df["HeartDisease"] == 0][feature], alpha=0.5, shade=True, color="green",
+                                label="Normal", ax=ax)
+                    plt.title(f'Distribution of {feature}', fontsize=18)
+                    ax.set_xlabel(feature)
+                    ax.set_ylabel("Frequency")
+                    ax.legend()
+                    plt.show()
+
+        if 'correlation' in plot_types:
+            correlation = self.df.corr().round(2)
+            plt.figure(figsize=(15, 12))
+            sns.heatmap(correlation, annot=True, cmap='YlOrBr')
+            plt.title('Correlation Heatmap')
+            plt.show()
 
 path = 'data/heart_2020.csv'
-# df = pd.read_csv(path)
 
 data_analysis_instance = DataAnalysis(path, 'HeartDisease')
 
@@ -171,7 +217,11 @@ data_analysis_instance.describe_variables()
 # Process all the data to numeric values
 data_analysis_instance.process_data()
 
+# Determine the range of values for each variable
+data_analysis_instance.determine_range()
+
 # Verify the presence of duplicated data and remove it
 data_analysis_instance.assess_quality()
 
-#data_analysis_instance.count_plots()
+# Plots after the cleansing
+data_analysis_instance.plots(['count', 'correlation'])
