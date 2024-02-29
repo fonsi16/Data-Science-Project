@@ -1,3 +1,4 @@
+#%% 1- Data Analysis (Processing and Visualization)
 import pandas as pd
 import numpy as np
 import seaborn as sns
@@ -19,7 +20,7 @@ class DataAnalysis:
         # Concatenate the labels to the dataset
         self.df_with_labels = pd.concat([self.df, self.labels], axis=1)
 
-        self.valid_plot_types = ['count', 'violin', 'box', 'scatter', 'lines', 'bar', 'lollypops', 'kde', 'correlation']
+        self.valid_plot_types = ['count', 'hist', 'kde', 'correlation', 'box', 'split_violin']
 
     def describe_variables(self):
         print("\nInformation of Data:")
@@ -34,7 +35,33 @@ class DataAnalysis:
         print("\nRange of values for each variable:")
         print(self.df.max() - self.df.min())
 
-    def age_feature(self):
+        # Display the range of values for each variable per class label
+        # print("\nRange of values for each variable per class label:")
+        # print(self.df_with_labels.max() - self.df_with_labels.min())
+
+    """
+        1 -> severe thinness
+        2 -> moderate thinness
+        3 -> mild thinness
+        4 -> normal
+        5 -> overweight
+        6 -> obese class 1
+        7 -> obese class 2
+        8 -> obese class 3
+    """
+    def bmi_class(self):
+        bmi = self.df["BMI"]
+        condition = [bmi < 16, bmi < 17, bmi < 18.5, bmi < 25, bmi < 30, bmi < 35, bmi < 40, bmi >= 40]
+        choice = [1, 2, 3, 4, 5, 6, 7, 8]
+        self.df["BMIClass"] = np.select(condition, choice)
+
+    def sleep_class(self):
+        sleep = self.df["SleepTime"]
+        condition = [sleep < 6, sleep < 9, sleep >= 9]
+        choice = [1, 2, 3]
+        self.df["SleepClass"] = np.select(condition, choice)
+
+    def age_category(self):
         age = self.df["AgeCategory"]
         condition = [
             age == "18-24", age == "25-29",
@@ -48,29 +75,7 @@ class DataAnalysis:
         choice = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13]
         self.df["AgeCategory"] = np.select(condition, choice, default=0)
 
-    """
-        1 -> severe thinness
-        2 -> moderate thinness
-        3 -> mild thinness
-        4 -> normal
-        5 -> overweight
-        6 -> obese class 1
-        7 -> obese class 2
-        8 -> obese class 3
-    """
-    def bmi_feature(self):
-        bmi = self.df["BMI"]
-        condition = [bmi < 16, bmi < 17, bmi < 18.5, bmi < 25, bmi < 30, bmi < 35, bmi < 40, bmi >= 40]
-        choice = [1, 2, 3, 4, 5, 6, 7, 8]
-        self.df["BMI"] = np.select(condition, choice)
-
-    def sleep_feature(self):
-        sleep = self.df["SleepTime"]
-        condition = [sleep < 6, sleep < 9, sleep >= 9]
-        choice = [1, 2, 3]
-        self.df["SleepTime"] = np.select(condition, choice)
-
-    def race_feature(self):
+    def race_category(self):
         race = self.df["Race"]
         condition = [
             race == "White", race == "Black",
@@ -79,7 +84,7 @@ class DataAnalysis:
         choice = [1, 2, 3, 4, 5, 6]
         self.df["Race"] = np.select(condition, choice)
 
-    def genhealth_feature(self):
+    def genhealth_category(self):
         genhealth = self.df["GenHealth"]
         condition = [
             genhealth == "Excellent", genhealth == "Very good",
@@ -90,32 +95,34 @@ class DataAnalysis:
 
     def process_data(self):
 
-        #Turn all the features to numerical values:
-        #HeartDisease (0-No / 1-Yes)
-        #BMI (1-<16, 2-<17, 3-<18.5, 4-<25, 5-<30, 6-<35, 7-<40, 8->=40)
-        #Smoking (0-No / 1-Yes)
-        #AlcoholDrinking (0-No / 1-Yes)
-        #Stroke (0-No / 1-Yes)
-        #PhysicalHealth - Doesn't need it
-        #MentalHealth - Doesn't need it
-        #DiffWalking (0-No / 1-Yes)
-        #Sex (0-Female / 1-Male)
-        #AgeCategory (1-(18-24) / 2-(25-29) / 3-(30-34) / 4-(35-39) / 5-(40-44) / 6-(45-49) / 7-(50-54) / 8-(55-59) / 9-(60-64) / 10-(65-69) / 11-(70-74) / 12-(75-79) / 13-(80 or older))
-        #Race (1-White / 2-Black / 3-Hispanic / 4-Asian / 5-American Indian/Alaskan Native / 6-Other)
-        #Diabetic (0-No / 0-No, borderline diabetes / 2-Yes (during pregnancy) / 2-Yes)
-        #PhysicalActivity (0-No / 1-Yes)
-        #GenHealth - (1-Excellent / 2-Very good / 3-Good / 4-Fair / 5-Poor)
-        #SleepTime (1-<6, 2-<9, 3->=9)
-        #Asthma (0-No / 1-Yes)
-        #KidneyDisease (0-No / 1-Yes)
-        #SkinCancer (0-No / 1-Yes)
+        # Turn all the features to numerical values:
+        # HeartDisease (0-No / 1-Yes)
+        # Smoking (0-No / 1-Yes)
+        # AlcoholDrinking (0-No / 1-Yes)
+        # Stroke (0-No / 1-Yes)
+        # PhysicalHealth - Doesn't need it
+        # MentalHealth - Doesn't need it
+        # DiffWalking (0-No / 1-Yes)
+        # Sex (0-Female / 1-Male)
+        # AgeCategory (1-(18-24) / 2-(25-29) / 3-(30-34) / 4-(35-39) / 5-(40-44) / 6-(45-49) / 7-(50-54) / 8-(55-59) / 9-(60-64) / 10-(65-69) / 11-(70-74) / 12-(75-79) / 13-(80 or older))
+        # Race (1-White / 2-Black / 3-Hispanic / 4-Asian / 5-American Indian/Alaskan Native / 6-Other)
+        # Diabetic (0-No / 0-No, borderline diabetes / 2-Yes (during pregnancy) / 2-Yes)
+        # PhysicalActivity (0-No / 1-Yes)
+        # GenHealth - (1-Excellent / 2-Very good / 3-Good / 4-Fair / 5-Poor)
+        # Asthma (0-No / 1-Yes)
+        # KidneyDisease (0-No / 1-Yes)
+        # SkinCancer (0-No / 1-Yes)
+
+        # BMIClass (1-<16, 2-<17, 3-<18.5, 4-<25, 5-<30, 6-<35, 7-<40, 8->=40)
+        # SleepClass (1-<6, 2-<9, 3->=9)
 
         # Process features
-        self.age_feature()
-        self.bmi_feature()
-        #self.sleep_feature()
-        self.race_feature()
-        self.genhealth_feature()
+        self.age_category()
+        self.race_category()
+        self.genhealth_category()
+
+        self.bmi_class()
+        self.sleep_class()
 
         # Map categorical features to numerical values
         self.df["HeartDisease"] = self.df["HeartDisease"].map({"No": 0, "Yes": 1})
@@ -138,13 +145,15 @@ class DataAnalysis:
         print("\nOriginal Dataset:")
         print(self.df.info)
 
+        # Original Data Plots
+        #data_analysis_instance.plots(['count', 'kde', 'box'])
+        data_analysis_instance.plots(['split_violin'])
+
         print("Missing values:\n", self.df.isnull().sum())
         print("Duplicate Rows:", self.df.duplicated().sum())
 
         if self.df.duplicated().sum() > 0:
             self.df = self.df.drop_duplicates(keep='first')
-
-        #data_analysis_instance.plots(['count', 'kde'])
 
         print("\nDetecting outliers:")
         for feature in self.df:
@@ -189,7 +198,12 @@ class DataAnalysis:
                     sns.countplot(x=feature, data=self.df, hue=self.target, ax=ax)
                     ax.set_title(f'Countplot of {feature} by {self.target}')
                     plt.show()
-                if plot_type == 'kde' and feature in ['BMI', 'SleepTime', 'PhysicalHealth', 'MenHealth']:
+                if plot_type == 'hist':
+                    fig, ax = plt.subplots(figsize=(8, 6))
+                    sns.histplot(x=feature, data=self.df, hue=self.target, ax=ax)
+                    ax.set_title(f'Histogram of {feature}')
+                    plt.show()
+                if plot_type == 'kde' and feature in ['BMI', 'SleepTime', 'PhysicalHealth', 'MenHealth', 'AgeCategory']:
                     fig, ax = plt.subplots(figsize=(13, 5))
                     sns.kdeplot(self.df[self.df["HeartDisease"] == 1][feature], alpha=0.5, shade=True, color="red",
                                 label="HeartDisease", ax=ax)
@@ -200,6 +214,16 @@ class DataAnalysis:
                     ax.set_ylabel("Frequency")
                     ax.legend()
                     plt.show()
+                if plot_type == 'box' and feature in ['BMI', 'SleepTime', 'PhysicalHealth', 'MenHealth', 'AgeCategory']:
+                    fig, ax = plt.subplots(figsize=(8, 6))
+                    sns.boxplot(x=self.target, y=feature, data=self.df, ax=ax)
+                    ax.set_title(f'Boxplot of {feature} by {self.target}')
+                    plt.show()
+                if plot_type == 'split_violin' and feature in ['BMI', 'SleepClass', 'PhysicalHealth', 'MenHealth', 'AgeCategory', 'GenHealth']:
+                    fig, ax = plt.subplots(figsize=(8, 6))
+                    sns.violinplot(x=self.target, y=feature, hue=self.target, split=True, data=self.df, ax=ax)
+                    ax.set_title(f'Split Violin Plot of {feature} by {self.target}')
+                    plt.show()
 
         if 'correlation' in plot_types:
             correlation = self.df.corr().round(2)
@@ -207,6 +231,7 @@ class DataAnalysis:
             sns.heatmap(correlation, annot=True, cmap='YlOrBr')
             plt.title('Correlation Heatmap')
             plt.show()
+
 
 path = 'data/heart_2020.csv'
 
@@ -224,4 +249,6 @@ data_analysis_instance.determine_range()
 data_analysis_instance.assess_quality()
 
 # Plots after the cleansing
-data_analysis_instance.plots(['count', 'correlation'])
+#data_analysis_instance.plots(['count', 'kde', 'split_violin', 'correlation'])
+
+#%% 2- Data Analysis
