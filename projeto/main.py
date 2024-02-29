@@ -93,6 +93,20 @@ class DataAnalysis:
         choice = [1, 2, 3, 4, 5]
         self.df["GenHealth"] = np.select(condition, choice)
 
+    def healthy_category(self):
+        smoker = self.df["Smoking"]
+        alcohol = self.df["AlcoholDrinking"]
+        stroke = self.df["Stroke"]
+        diffWalk = self.df["DiffWalking"]
+        diabetic = self.df["Diabetic"]
+        asthma = self.df["Asthma"]
+
+        condition = (smoker + alcohol + stroke + diffWalk + diabetic + asthma)
+
+        self.df["BadHealthScore"] = condition
+
+
+
     def process_data(self):
 
         # Turn all the features to numerical values:
@@ -137,6 +151,8 @@ class DataAnalysis:
         self.df["KidneyDisease"] = self.df["KidneyDisease"].map({"No": 0, "Yes": 1})
         self.df["SkinCancer"] = self.df["SkinCancer"].map({"No": 0, "Yes": 1})
 
+        self.healthy_category()
+
         print("\nProcessed Dataset:")
         print(self.df.info())
 
@@ -147,7 +163,7 @@ class DataAnalysis:
 
         # Original Data Plots
         #data_analysis_instance.plots(['count', 'kde', 'box'])
-        data_analysis_instance.plots(['split_violin'])
+        data_analysis_instance.plots(['correlation'])
 
         print("Missing values:\n", self.df.isnull().sum())
         print("Duplicate Rows:", self.df.duplicated().sum())
@@ -228,8 +244,10 @@ class DataAnalysis:
         if 'correlation' in plot_types:
             correlation = self.df.corr().round(2)
             plt.figure(figsize=(15, 12))
-            sns.heatmap(correlation, annot=True, cmap='YlOrBr')
+            sns.heatmap(correlation, annot=True, cmap='YlOrBr', annot_kws={'size': 8})
             plt.title('Correlation Heatmap')
+            plt.xticks(rotation=45)
+            plt.tight_layout()
             plt.show()
 
 
