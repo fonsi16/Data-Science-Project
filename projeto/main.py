@@ -9,10 +9,16 @@ from sklearn.manifold import TSNE
 from sklearn.manifold import LocallyLinearEmbedding
 from sklearn.discriminant_analysis import LinearDiscriminantAnalysis
 import umap
-from scipy.stats import entropy
+from scipy.stats import entropy, ttest_ind, f_oneway, ttest_rel, wilcoxon, kruskal, friedmanchisquare, probplot, shapiro
 from scipy.fftpack import fft
 from mrmr import mrmr_classif
 from sklearn.feature_selection import SequentialFeatureSelector
+
+from sklearn.preprocessing import OneHotEncoder, LabelEncoder
+
+import statsmodels.api as sm
+import statsmodels.stats.api as sms
+from statsmodels.formula.api import ols
 
 
 class DataAnalysis:
@@ -132,27 +138,6 @@ class DataAnalysis:
 
     def process_data(self):
 
-        # Turn all the features to numerical values:
-        # HeartDisease (0-No / 1-Yes)
-        # Smoking (0-No / 1-Yes)
-        # AlcoholDrinking (0-No / 1-Yes)
-        # Stroke (0-No / 1-Yes)
-        # PhysicalHealth - Doesn't need it
-        # MentalHealth - Doesn't need it
-        # DiffWalking (0-No / 1-Yes)
-        # Sex (0-Female / 1-Male)
-        # AgeCategory (1-(18-24) / 2-(25-29) / 3-(30-34) / 4-(35-39) / 5-(40-44) / 6-(45-49) / 7-(50-54) / 8-(55-59) / 9-(60-64) / 10-(65-69) / 11-(70-74) / 12-(75-79) / 13-(80 or older))
-        # Race (1-White / 2-Black / 3-Hispanic / 4-Asian / 5-American Indian/Alaskan Native / 6-Other)
-        # Diabetic (0-No / 0-No, borderline diabetes / 2-Yes (during pregnancy) / 2-Yes)
-        # PhysicalActivity (0-No / 1-Yes)
-        # GenHealth - (1-Excellent / 2-Very good / 3-Good / 4-Fair / 5-Poor)
-        # Asthma (0-No / 1-Yes)
-        # KidneyDisease (0-No / 1-Yes)
-        # SkinCancer (0-No / 1-Yes)
-
-        # BMIClass (1-<16, 2-<17, 3-<18.5, 4-<25, 5-<30, 6-<35, 7-<40, 8->=40)
-        # SleepClass (1-<6, 2-<9, 3->=9)
-
         # Map categorical features to numerical values
         self.df["HeartDisease"] = self.df["HeartDisease"].map({"No": 0, "Yes": 1})
         self.df["Smoking"] = self.df["Smoking"].map({"No": 0, "Yes": 1})
@@ -203,6 +188,12 @@ class DataAnalysis:
 
         print("\nDetecting outliers:")
         for feature in self.df:
+
+            # Check if the feature is binary (0 or 1)
+            if set(self.df[feature]) == {0, 1}:
+                # Skip replacing outliers for binary features
+                continue
+
             q1 = self.df[feature].quantile(0.25)
             q3 = self.df[feature].quantile(0.75)
             iqr = q3 - q1
@@ -210,11 +201,6 @@ class DataAnalysis:
             upper_bound = q3 + 1.5 * iqr
             outliers = self.df[(self.df[feature] < lower_bound) | (self.df[feature] > upper_bound)]
             print(f"Outliers in '{feature}':\n{outliers}" if not outliers.empty else f"No outliers in '{feature}'.")
-
-            # Check if the feature is binary (0 or 1)
-            if set(self.df[feature]) == {0, 1}:
-                # Skip replacing outliers for binary features
-                continue
 
             # Replace outliers with median value
             median_value = self.df[feature].median()
@@ -281,169 +267,12 @@ class DataAnalysis:
             plt.show()
 
 
-class PCAAnalysis:
-    def __init__(self, dataset_path, num_components):
-
-        # Extract features (X) and target variable (y) from the dataset
-        self.X = pd.read_csv(dataset_path)
-        self.y = self.X['HeartDisease']
-
-        if num_components > self.X.shape[1]:
-            raise ValueError("Number of components cannot exceed the number of features.")
-
-        # Configuration
-        self.num_components = num_components
-
-        # Plots
-        self.fig, self.axes = None, None
-
-        # Implemented PCA
-        self.X_standardized = self._standardize_data()
-        self.cov_matrix = self._compute_covariance_matrix()
-        self.eigenvalues, self.eigenvectors = self._compute_eigenvalues_eigenvectors()
-        self.eigenvalues, self.eigenvectors = self._sort_eigenvectors()
-        self.pca_projection = self._project_data()
-
-        # Library PCA
-        self.sklearn_pca_projection, self.sklearn_pca = self._apply_sklearn_pca()
-
-    def _standardize_data(self):
-        """
-        Step 1: Standardize the dataset.
-        """
-        return StandardScaler().fit_transform(self.X)
-
-    def _compute_covariance_matrix(self):
-        """
-        Step 2: Compute the covariance matrix.
-        """
-        return np.cov(self.X_standardized.T)
-
-    def _compute_eigenvalues_eigenvectors(self):
-        """
-        Step 3: Compute the eigenvectors and eigenvalues.
-        """
-        return np.linalg.eig(self.cov_matrix)
-
-    def _sort_eigenvectors(self):
-        """
-        Step 4: Sort eigenvectors based on eigenvalues.
-        """
-        sorted_indices = np.argsort(self.eigenvalues)[::-1]
-        return self.eigenvalues[sorted_indices], self.eigenvectors[:, sorted_indices]
-
-    def _project_data(self):
-        """
-        Step 5: Select the number of principal components and project the data onto them.
-        """
-        return self.X_standardized.dot(self.eigenvectors[:, :self.num_components])
-
-    def _apply_sklearn_pca(self):
-        """
-        Apply PCA using sklearn (for comparison).
-        """
-        pca = PCA(n_components=self.num_components)
-        return pca.fit_transform(self.X_standardized), pca
-
-    def display_feature_contributions(self):
-        """
-        Display feature contributions to principal components.
-        """
-        print("\nFeature Contributions to Principal Components:")
-        for i, eigenvector in enumerate(self.eigenvectors.T):
-            print(f"Principal Component {i + 1}:")
-            for j, feature_contribution in enumerate(eigenvector):
-                print(f"   Feature {j + 1}: {feature_contribution:.4f}")
-
-    def calculate_explained_variance_ratio(self):
-        """
-        Calculate explained variance ratio for both developed and library PCA.
-        """
-        explained_variance_ratio = self.eigenvalues[:self.num_components] / np.sum(self.eigenvalues)
-        print(f"\nExplained Variance of the developed PCA using {self.num_components} component(s): ",
-              np.sum(explained_variance_ratio))
-        print(f"Explained Variance of the library PCA using {self.num_components} component(s): ",
-              np.sum(self.sklearn_pca.explained_variance_ratio_))
-
-    def plot_explained_variance_ratio(self):
-        """
-        Plot the explained variance ratio of the developed PCA.
-        """
-        explained_variance_ratio = self.eigenvalues[:self.num_components] / np.sum(self.eigenvalues)
-        plt.figure(figsize=(8, 6))
-        bars = plt.bar(range(1, self.num_components + 1), explained_variance_ratio, alpha=0.5, align='center')
-        for bar, value in zip(bars, explained_variance_ratio):
-            plt.text(bar.get_x() + bar.get_width() / 2, bar.get_height() + 0.01, f'{value:.2f}', ha='center',
-                     va='bottom')
-        plt.ylabel('Explained Variance Ratio')
-        plt.xlabel('Principal Components')
-        plt.title('Explained Variance Ratio per Principal Component')
-        plt.grid(True)
-        plt.show()
-
-    def print_pca_projection(self):
-        """
-        Show the first lines of the developed and the library PCA projection.
-        """
-        print("\nPCA Projection (Manual):\n", self.pca_projection[:5])
-        print("\nPCA Projection (Sklearn):\n", self.sklearn_pca_projection[:5])
-
-    def plot_pca_projections(self):
-        """
-        Plot PCA projections for principal and for the two principal components in a 4 by 4 grid.
-        """
-
-        # For the developed PCA
-        self.fig, self.axes = plt.subplots(2, 2, figsize=(12, 10))
-        self.axes[0, 0].scatter(self.pca_projection[:, 0], self.pca_projection[:, 0], c=self.y, cmap='viridis',
-                                alpha=0.8)
-        self.axes[0, 0].set_title('PCA Projection of the First Principal Component (Manual)')
-        self.axes[0, 0].set_xlabel('Principal Component 1')
-        self.axes[0, 0].set_ylabel('Principal Component 1')
-        self.axes[0, 0].grid(True)
-
-        self.axes[0, 1].scatter(self.pca_projection[:, 0], self.pca_projection[:, 1], c=self.y, cmap='viridis',
-                                alpha=0.8)
-        self.axes[0, 1].set_title('PCA Projection of the First Two Principal Components (Manual)')
-        self.axes[0, 1].set_xlabel('Principal Component 1')
-        self.axes[0, 1].set_ylabel('Principal Component 2')
-        self.axes[0, 1].grid(True)
-
-        # For th library PCA
-        self.axes[1, 0].scatter(self.sklearn_pca_projection[:, 0], self.sklearn_pca_projection[:, 0], c=self.y,
-                                cmap='viridis', alpha=0.8)
-        self.axes[1, 0].set_title('PCA Projection of the First Principal Component (Sklearn)')
-        self.axes[1, 0].set_xlabel('Principal Component 1')
-        self.axes[1, 0].set_ylabel('Principal Component 1')
-        self.axes[1, 0].grid(True)
-
-        scatter = self.axes[1, 1].scatter(self.sklearn_pca_projection[:, 0], self.sklearn_pca_projection[:, 1],
-                                          c=self.y, cmap='viridis', alpha=0.8)
-        self.axes[1, 1].set_title('PCA Projection of the First Two Principal Components (Sklearn)')
-        self.axes[1, 1].set_xlabel('Principal Component 1')
-        self.axes[1, 1].set_ylabel('Principal Component 2')
-        self.axes[1, 1].grid(True)
-
-        # The * before scatter.legend_elements() is the unpacking operator in Python, when used before an iterable
-        # (such as a list or a tuple), it unpacks the elements of the iterable into positional arguments of a function
-        # or method call. In this specific context, scatter.legend_elements() returns a tuple containing two elements:
-        # handles and labels. The handles represent the plotted elements (in this case, the points in the scatter plot),
-        # and the labels represent the corresponding labels for those elements (in this case, the class labels). By
-        # using * before scatter.legend_elements(), we are unpacking the tuple returned by scatter.legend_elements()
-        # into separate arguments, which are then passed as positional arguments to the legend() method of the
-        # matplotlib.axes.Axes object.
-        self.axes[1, 1].add_artist(
-            self.axes[1, 1].legend(*scatter.legend_elements(), title="Classes", loc="lower right"))
-        plt.tight_layout()
-        plt.show()
-
-
 class DimensionalityReduction:
-    def __init__(self, dataset_path):
+    def __init__(self, dataset):
         """
         Initialize the DimensionalityReduction object with the dataset.
         """
-        self.dataset = pd.read_csv(dataset_path)
+        self.dataset = dataset
 
         # Sample 5% of the data
         self.dataset = self.dataset.sample(frac=0.05, random_state=42)
@@ -578,28 +407,14 @@ class FeatureExtractor:
         return np.column_stack((mean, std_dev, median, min_val, max_val))
 
     def _pairwise_differences(self):
-        """
-        Computes the pairwise absolute differences between each pair of features per line.
-
-        Returns:
-        -------
-        pd.DataFrame:
-            A DataFrame containing pairwise absolute differences between each pair of features.
-            The DataFrame has (n-1) * n / 2 columns, where n is the number of features in the dataset.
-            Each row represents the absolute differences between pairs of features for a single data point.
-        """
-        # Calculate the number of features
         num_features = self.data.shape[1]
-
-        # Initialize an empty DataFrame to store the pairwise differences
         pairwise_diff_df = pd.DataFrame()
 
-        # Compute pairwise absolute differences for each pair of features
         for i in range(num_features - 1):
             for j in range(i + 1, num_features):
                 feature_name = f'pairwise_diff_{i + 1}_vs_{j + 1}'
-                pairwise_diff_df[feature_name] = np.abs(self.data[:, i] - self.data[:, j])
-                self.feature_names.extend([feature_name])
+                pairwise_diff_df[feature_name] = np.abs(self.data.iloc[:, i] - self.data.iloc[:, j])
+                self.feature_names.append(feature_name)
 
         return pairwise_diff_df
 
@@ -617,41 +432,14 @@ class FeatureExtractor:
         return np.abs(fft_result).mean(axis=1).reshape(-1, 1)
 
     def _entropy_features(self):
-        """
-        Computes entropy-based features per sample (row) of the dataset.
 
-        Returns:
-        - numpy.ndarray: An array containing entropy-based features per sample.
-        """
-        # Compute entropy-based features
-        entropy_vals = [entropy(self.data[i]) for i in range(len(self.data))]
+        # Compute entropy-based features for each row
+        entropy_vals = np.array([entropy(row) for idx, row in self.data.iterrows()])
+
         # Append feature names
-        self.feature_names.extend(['Entropy'])
-        return np.array(entropy_vals).reshape(-1, 1)
+        self.feature_names.append('Entropy')
 
-    def _area_based_features(self):
-        """
-        Calculate area-based features including petal area, sepal area, and petal to sepal area ratio.
-
-        Returns:
-        - numpy.ndarray: An array containing the calculated features.
-        """
-        petal_length = self.data[:, 2]
-        petal_width = self.data[:, 3]
-        sepal_length = self.data[:, 0]
-        sepal_width = self.data[:, 1]
-        # Calculate petal area (assuming petal shape is close to an ellipse)
-        petal_area = np.pi * (petal_length / 2) * (petal_width / 2)
-        # Calculate sepal area (assuming sepal shape is close to a rectangle)
-        sepal_area = sepal_length * sepal_width
-        # Calculate petal to sepal area ratio
-        ratio_petal_sepal_area = petal_area / sepal_area
-        # Add the features names
-        self.feature_names.extend(['Petal_area'])
-        self.feature_names.extend(['Sepal_area'])
-        self.feature_names.extend(['Ratio_petal_sepal_area'])
-        # Stack the calculated features horizontally
-        return np.column_stack((petal_area, sepal_area, ratio_petal_sepal_area))
+        return entropy_vals.reshape(-1, 1)
 
     def extract_features(self):
         """
@@ -662,7 +450,7 @@ class FeatureExtractor:
         """
         # Extract and combine all features with the original features passed in data
         self.all_features = np.hstack((self.data, self._statistical_features(), self._pairwise_differences(),
-                                  self._frequency_domain_features(), self._entropy_features(), self._area_based_features()))
+                                  self._frequency_domain_features(), self._entropy_features()))
         # Create pandas dataframe
         return pd.DataFrame(data=self.all_features, columns=self.feature_names)
 
@@ -672,34 +460,32 @@ class FeatureExtractor:
         Each histogram is plotted separately for each feature, with optional coloring based on provided labels.
         """
         num_features = self.all_features.shape[1]
-        num_rows = int(np.ceil(np.sqrt(num_features)))
-        num_cols = int(np.ceil(num_features / num_rows))
+        num_cols = 4  # Adjust the number of columns to control subplot arrangement
+        num_rows = int(np.ceil(num_features / num_cols))
 
-        fig, axes = plt.subplots(num_rows, num_cols, figsize=(15, 15))
+        fig, axes = plt.subplots(num_rows, num_cols, figsize=(15, 3 * num_rows))
         fig.suptitle('All Features', fontsize=20)
 
-        for i in range(num_rows):
-            for j in range(num_cols):
-                idx = i * num_cols + j
-                if idx < num_features:
-                    ax = axes[i, j]
-                    ax.set_title(f'Feature {self.feature_names[idx]}', fontsize=12)
-                    ax.set_xlabel('Value', fontsize=10)
-                    ax.set_ylabel('Frequency', fontsize=10)
-                    ax.grid(True)
-                    if self.labels is not None:
-                        # Add a plot per feature
-                        unique_labels = np.unique(self.labels)
-                        for label in unique_labels:
-                            ax.hist(self.all_features[self.labels == label, idx], bins=20, alpha=0.7, label=label)
-                        ax.legend()
+        for idx, ax in enumerate(axes.flat):
+            if idx < num_features:
+                ax.set_title(f'Feature {self.feature_names[idx]}', fontsize=12)
+                ax.set_xlabel('Value', fontsize=10)
+                ax.set_ylabel('Frequency', fontsize=10)
+                ax.grid(True)
+
+                if self.labels is not None:
+                    # Add a plot per feature and label
+                    for label in self.labels:
+                        mask = np.array(self.data['HeartDisease'] == label)
+                        ax.hist(self.all_features[mask, idx], bins=20, alpha=0.7, label=label)
+                    ax.legend()
 
         plt.tight_layout()
         plt.show()
 
 
 class FeatureSelector:
-    def __init__(self, data, labels):
+    def __init__(self, data):
         """
         Initialize the FeatureSelector instance.
 
@@ -708,7 +494,7 @@ class FeatureSelector:
         - labels (numpy.ndarray): The labels array with shape (n_samples,).
         """
         self.data = data
-        self.labels = labels
+        self.labels = self.data.iloc[:, 0].unique().tolist()
 
     def select_features_mrmr(self, k=5):
         """
@@ -738,7 +524,194 @@ class FeatureSelector:
         # Return the selected features
         return self.data.loc[:, sfs.get_support()].columns
 
+
+class HypothesisTester:
+
+    def unpaired_t_test(self, group1, group2):
+        """
+        Perform unpaired t-test for two groups.
+
+        Parameters:
+        - group1: List or array-like object containing data for group 1.
+        - group2: List or array-like object containing data for group 2.
+
+        Returns:
+        - t_statistic: The calculated t-statistic.
+        - p_value: The p-value associated with the t-statistic.
+        """
+        t_statistic, p_value = ttest_ind(group1, group2)
+        return t_statistic, p_value
+
+    def unpaired_anova(self, *groups):
+        """
+        Perform unpaired ANOVA for more than two groups.
+
+        Parameters:
+        - *groups: Variable length argument containing data for each group. Each argument should be a list or array-like
+        object.
+
+        Returns:
+        - f_statistic: The calculated F-statistic.
+        - p_value: The p-value associated with the F-statistic.
+        """
+        f_statistic, p_value = f_oneway(*groups)
+        return f_statistic, p_value
+
+    def paired_t_test(self, group1, group2):
+        """
+        Perform paired t-test for two groups.
+
+        Parameters:
+        - group1: List or array-like object containing data for group 1.
+        - group2: List or array-like object containing data for group 2.
+                  Should have the same length as group1.
+
+        Returns:
+        - t_statistic: The calculated t-statistic.
+        - p_value: The p-value associated with the t-statistic.
+        """
+        t_statistic, p_value = ttest_rel(group1, group2)
+        return t_statistic, p_value
+
+    def paired_anova(self, data):
+        """
+        Perform paired ANOVA (repeated measures ANOVA) for more than two groups.
+
+        Parameters:
+        - data: Pandas DataFrame containing the data with columns representing different conditions.
+
+        Returns:
+        - f_statistic: The calculated F-statistic.
+        - p_value: The p-value associated with the F-statistic.
+        """
+        model = ols('value ~ C(condition)', data=data).fit()
+        anova_table = sm.stats.anova_lm(model, typ=2)
+        return anova_table['F'][0], anova_table['PR(>F)'][0]
+
+    def wilcoxon_ranksum_test(self, group1, group2):
+        """
+        Perform Wilcoxon rank-sum test (Mann-Whitney U test) for two independent samples.
+
+        Parameters:
+        - group1: List or array-like object containing data for sample 1.
+        - group2: List or array-like object containing data for sample 2.
+
+        Returns:
+        - statistic: The calculated test statistic.
+        - p_value: The p-value associated with the test statistic.
+        """
+        statistic, p_value = sms.stattools.stats.mannwhitneyu(group1, group2)
+
+        return statistic, p_value
+
+    def wilcoxon_signedrank_test(self, group1, group2):
+        """
+        Perform Wilcoxon signed-rank test for paired samples.
+        Defines the alternative hypothesis with ‘greater’ option, this the distribution underlying d is stochastically
+        greater than a distribution symmetric about zero; d represent the difference between the paired samples:
+        d = x - y if both x and y are provided, or d = x otherwise.
+
+        Parameters:
+        - group1: List or array-like object containing data for sample 1.
+        - group2: List or array-like object containing data for sample 2.
+                  Should have the same length as group1.
+
+        Returns:
+        - statistic: The calculated test statistic.
+        - p_value: The p-value associated with the test statistic.
+        """
+        statistic, p_value = wilcoxon(group1, group2, alternative="greater")
+        return statistic, p_value
+
+    def kruskal_wallis_test(self, *groups):
+        """
+        Perform Kruskal-Wallis H test for independent samples.
+
+        Parameters:
+        - *groups: Variable length argument containing data for each group. Each argument should be a list or array-like
+        object.
+
+        Returns:
+        - statistic: The calculated test statistic.
+        - p_value: The p-value associated with the test statistic.
+        """
+        statistic, p_value = kruskal(*groups)
+        return statistic, p_value
+
+    def friedman_test(self, *groups):
+        """
+        Perform Friedman test for related samples.
+
+        Parameters:
+        - *groups: Variable length argument containing data for each group. Each argument should be a list or array-like
+        object representing measurements of the same individuals under different conditions.
+
+        Returns:
+        - statistic: The calculated test statistic.
+        - p_value: The p-value associated with the test statistic.
+        """
+        statistic, p_value = friedmanchisquare(*groups)
+        return statistic, p_value
+
+    def qq_plots(self, variable_names, *data_samples, distribution='norm'):
+        """
+        Generate Q-Q plots for multiple data samples.
+
+        Parameters:
+        - variable_names: List with the names of the variables to be plotted
+        - data_samples: Variable number of 1D array-like objects representing the data samples.
+        - distribution: String indicating the theoretical distribution to compare against. Default is 'norm' for normal
+        distribution.
+
+        Returns:
+        - None (displays the Q-Q plots)
+        """
+        num_samples = len(data_samples)
+        num_rows = (num_samples + 1) // 2  # Calculate the number of rows for subplots
+        num_cols = 2 if num_samples > 1 else 1  # Ensure at least 1 column for subplots
+
+        # Adjust the height of the figure to fit all Q-Q plots without overlapping
+        fig_height = 6 * num_rows  # Adjust this value as needed
+        fig, axes = plt.subplots(num_rows, num_cols, figsize=(12, fig_height))
+        axes = axes.flatten()  # Flatten axes if multiple subplots
+
+        for i, data in enumerate(data_samples):
+            ax = axes[i]
+            probplot(data, dist=distribution, plot=ax)
+            ax.set_title(f'Q-Q Plot ({distribution})')
+            ax.set_xlabel('Theoretical Quantiles')
+            ax.set_ylabel(variable_names[i])
+
+        # Adjust layout and show plots
+        plt.tight_layout()
+        plt.show()
+
+    def test_normality(self, variable_names, *data_samples):
+        """
+        Test the normality of multiple data samples using Shapiro-Wilk test.
+
+        Parameters:
+        - variable_names: List with the names of the variables to be tested.
+        - data_samples: Variable number of 1D array-like objects representing the data samples.
+
+        Returns:
+        - results: Dictionary containing the test results for each data sample.
+                   The keys are the variable names and the values are a tuple (test_statistic, p_value) for
+                   Shapiro-Wilk test.
+        """
+
+        print('\nNormality Test:\n')
+
+        results = {}
+        for name, data in zip(variable_names, data_samples):
+            results[name] = shapiro(data)
+        for variable_name, shapiro_result in results.items():
+            print(f'{variable_name}:')
+            print(f'Shapiro-Wilk test - Test statistic: {shapiro_result.statistic}, p-value: {shapiro_result.pvalue}')
+        return results
+
 #%% 1- Pre Processing and EDA
+
 
 path = 'data/heart_2020.csv'
 data_analysis_instance = DataAnalysis(path, 'HeartDisease')
@@ -755,43 +728,132 @@ data_analysis_instance.determine_range()
 data_analysis_instance.assess_quality()
 
 # Plots after the cleansing and processing
-#data_analysis_instance.plots(['correlation'])
+data_analysis_instance.plots(['correlation'])
 
 # Cleaned CSV
 path_cleaned = 'data/heart_2020_cleaned.csv'
-
-#pca_analysis = PCAAnalysis(path_cleaned, 2)
-
-#pca_analysis.display_feature_contributions()
-#pca_analysis.calculate_explained_variance_ratio()
-#pca_analysis.plot_explained_variance_ratio()
-#pca_analysis.print_pca_projection()
-#pca_analysis.plot_pca_projections()
+dataset_cleaned = pd.read_csv(path_cleaned)
 
 # Initialize DimensionalityReduction object with the dataset
-dr = DimensionalityReduction(path_cleaned)
+#dr = DimensionalityReduction(dataset_cleaned)
 
 # Compute and plot PCA projection
-# dr.plot_projection(dr.compute_pca(), 'PCA Projection')
+#dr.plot_projection(dr.compute_pca(), 'PCA Projection')
 # Compute and plot LDA projection
 # dr.plot_projection(dr.compute_lda(), 'LDA Projection')
 # Compute and plot t-SNE projection
-# dr.plot_projection(dr.compute_tsne(), 't-SNE Projection')
+#dr.plot_projection(dr.compute_tsne(), 't-SNE Projection')
 # Compute and plot UMAP projection
-# dr.plot_projection(dr.compute_umap(), 'UMAP Projection')
+#dr.plot_projection(dr.compute_umap(), 'UMAP Projection')
 # Compute and plot LLE projection
-# dr.plot_projection(dr.compute_lle(), 'LLE Projection')
+#dr.plot_projection(dr.compute_lle(), 'LLE Projection')
 
-# Initialize FeatureExtractor object with the dataset
-extractor = FeatureExtractor(path_cleaned)
-
-# Extract features
-feature_df = extractor.extract_features()
-# Display the dataframe
-print(feature_df)
-# Plot the features per class
-extractor.plot_all_features()
 
 #%% 2- Hypothesis Testing
 
+# Column Data
+BMI = dataset_cleaned['BMI']
+Smoke = dataset_cleaned['Smoking']
+Alcohol = dataset_cleaned['AlcoholDrinking']
+Stroke = dataset_cleaned['Stroke']
+PH = dataset_cleaned['PhysicalHealth']
+MH = dataset_cleaned['MentalHealth']
+DW = dataset_cleaned['DiffWalking']
+Sex = dataset_cleaned['Sex']
+AC = dataset_cleaned['AgeCategory']
+Race = dataset_cleaned['Race']
+Diabetic = dataset_cleaned['Diabetic']
+PA = dataset_cleaned['PhysicalActivity']
+GH = dataset_cleaned['GenHealth']
+ST = dataset_cleaned['SleepTime']
+Asthma = dataset_cleaned['Asthma']
+KD = dataset_cleaned['KidneyDisease']
+SC = dataset_cleaned['SkinCancer']
+
+# Column Data with Hearth Disease
+BMI_with_HD = dataset_cleaned['BMI'][dataset_cleaned['HeartDisease'] == 1]
+Smoke_with_HD = dataset_cleaned['Smoking'][dataset_cleaned['HeartDisease'] == 1]
+Alcohol_with_HD = dataset_cleaned['AlcoholDrinking'][dataset_cleaned['HeartDisease'] == 1]
+Stroke_with_HD = dataset_cleaned['Stroke'][dataset_cleaned['HeartDisease'] == 1]
+PH_with_HD = dataset_cleaned['PhysicalHealth'][dataset_cleaned['HeartDisease'] == 1]
+MH_with_HD = dataset_cleaned['MentalHealth'][dataset_cleaned['HeartDisease'] == 1]
+DW_with_HD = dataset_cleaned['DiffWalking'][dataset_cleaned['HeartDisease'] == 1]
+Sex_with_HD = dataset_cleaned['Sex'][dataset_cleaned['HeartDisease'] == 1]
+AC_with_HD = dataset_cleaned['AgeCategory'][dataset_cleaned['HeartDisease'] == 1]
+Race_with_HD = dataset_cleaned['Race'][dataset_cleaned['HeartDisease'] == 1]
+Diabetic_with_HD = dataset_cleaned['Diabetic'][dataset_cleaned['HeartDisease'] == 1]
+PA_with_HD = dataset_cleaned['PhysicalActivity'][dataset_cleaned['HeartDisease'] == 1]
+GH_with_HD = dataset_cleaned['GenHealth'][dataset_cleaned['HeartDisease'] == 1]
+ST_with_HD = dataset_cleaned['SleepTime'][dataset_cleaned['HeartDisease'] == 1]
+Asthma_with_HD = dataset_cleaned['Asthma'][dataset_cleaned['HeartDisease'] == 1]
+KD_with_HD = dataset_cleaned['KidneyDisease'][dataset_cleaned['HeartDisease'] == 1]
+SC_with_HD = dataset_cleaned['SkinCancer'][dataset_cleaned['HeartDisease'] == 1]
+
+# Column Data without Hearth Disease
+BMI_without_HD = dataset_cleaned['BMI'][dataset_cleaned['HeartDisease'] == 0]
+Smoke_without_HD = dataset_cleaned['Smoking'][dataset_cleaned['HeartDisease'] == 0]
+Alcohol_without_HD = dataset_cleaned['AlcoholDrinking'][dataset_cleaned['HeartDisease'] == 0]
+Stroke_without_HD = dataset_cleaned['Stroke'][dataset_cleaned['HeartDisease'] == 0]
+PH_without_HD = dataset_cleaned['PhysicalHealth'][dataset_cleaned['HeartDisease'] == 0]
+MH_without_HD = dataset_cleaned['MentalHealth'][dataset_cleaned['HeartDisease'] == 0]
+DW_without_HD = dataset_cleaned['DiffWalking'][dataset_cleaned['HeartDisease'] == 0]
+Sex_without_HD = dataset_cleaned['Sex'][dataset_cleaned['HeartDisease'] == 0]
+AC_without_HD = dataset_cleaned['AgeCategory'][dataset_cleaned['HeartDisease'] == 0]
+Race_without_HD = dataset_cleaned['Race'][dataset_cleaned['HeartDisease'] == 0]
+Diabetic_without_HD = dataset_cleaned['Diabetic'][dataset_cleaned['HeartDisease'] == 0]
+PA_without_HD = dataset_cleaned['PhysicalActivity'][dataset_cleaned['HeartDisease'] == 0]
+GH_without_HD = dataset_cleaned['GenHealth'][dataset_cleaned['HeartDisease'] == 0]
+ST_without_HD = dataset_cleaned['SleepTime'][dataset_cleaned['HeartDisease'] == 0]
+Asthma_without_HD = dataset_cleaned['Asthma'][dataset_cleaned['HeartDisease'] == 0]
+KD_without_HD = dataset_cleaned['KidneyDisease'][dataset_cleaned['HeartDisease'] == 0]
+SC_without_HD = dataset_cleaned['SkinCancer'][dataset_cleaned['HeartDisease'] == 0]
+
+# Initialize the HypothesisTester class with the data
+tester = HypothesisTester()
+
+# Perform normality analysis, first by visual checking using a Q-Q plot and then by normality test
+tester.qq_plots(['BMI_with_HD', 'Smoke_with_HD', 'Alcohol_with_HD', 'Stroke_with_HD', 'PH_with_HD', 'MH_with_HD', 'DW_with_HD',
+                'Sex_with_HD', 'AC_with_HD', 'Race_with_HD', 'Diabetic_with_HD', 'PA_with_HD', 'GH_with_HD', 'ST_with_HD',
+                'Asthma_with_HD', 'KD_with_HD', 'SC_with_HD', 'BMI_without_HD', 'Smoke_without_HD', 'Alcohol_without_HD',
+                'Stroke_without_HD', 'PH_without_HD', 'MH_without_HD', 'DW_without_HD', 'Sex_without_HD', 'AC_without_HD',
+                'Race_without_HD', 'Diabetic_without_HD', 'PA_without_HD', 'GH_without_HD', 'ST_without_HD',
+                'Asthma_without_HD', 'KD_without_HD', 'SC_without_HD'], BMI_with_HD, Smoke_with_HD, Alcohol_with_HD,
+                Stroke_with_HD, PH_with_HD, MH_with_HD, DW_with_HD,
+                Sex_with_HD, AC_with_HD, Race_with_HD, Diabetic_with_HD, PA_with_HD, GH_with_HD, ST_with_HD,
+                Asthma_with_HD, KD_with_HD, SC_with_HD, BMI_without_HD, Smoke_without_HD, Alcohol_without_HD,
+                Stroke_without_HD, PH_without_HD, MH_without_HD, DW_without_HD, Sex_without_HD, AC_without_HD,
+                Race_without_HD, Diabetic_without_HD, PA_without_HD, GH_without_HD, ST_without_HD,
+                Asthma_without_HD, KD_without_HD, SC_without_HD)
+
+tester.test_normality(['BMI_with_HD', 'Smoke_with_HD', 'Alcohol_with_HD', 'Stroke_with_HD', 'PH_with_HD', 'MH_with_HD', 'DW_with_HD',
+                'Sex_with_HD', 'AC_with_HD', 'Race_with_HD', 'Diabetic_with_HD', 'PA_with_HD', 'GH_with_HD', 'ST_with_HD',
+                'Asthma_with_HD', 'KD_with_HD', 'SC_with_HD', 'BMI_without_HD', 'Smoke_without_HD', 'Alcohol_without_HD',
+                'Stroke_without_HD', 'PH_without_HD', 'MH_without_HD', 'DW_without_HD', 'Sex_without_HD', 'AC_without_HD',
+                'Race_without_HD', 'Diabetic_without_HD', 'PA_without_HD', 'GH_without_HD', 'ST_without_HD',
+                'Asthma_without_HD', 'KD_without_HD', 'SC_without_HD'], BMI_with_HD, Smoke_with_HD, Alcohol_with_HD,
+                Stroke_with_HD, PH_with_HD, MH_with_HD, DW_with_HD,
+                Sex_with_HD, AC_with_HD, Race_with_HD, Diabetic_with_HD, PA_with_HD, GH_with_HD, ST_with_HD,
+                Asthma_with_HD, KD_with_HD, SC_with_HD, BMI_without_HD, Smoke_without_HD, Alcohol_without_HD,
+                Stroke_without_HD, PH_without_HD, MH_without_HD, DW_without_HD, Sex_without_HD, AC_without_HD,
+                Race_without_HD, Diabetic_without_HD, PA_without_HD, GH_without_HD, ST_without_HD,
+                Asthma_without_HD, KD_without_HD, SC_without_HD)
+
+
 #%% 3- Modeling
+
+# extractor = FeatureExtractor(path_cleaned)
+
+# Extract features
+# feature_df = extractor.extract_features()
+# Display the dataframe
+# print(feature_df)
+# Plot the features per class
+# extractor.plot_all_features()
+
+# feature_selector = FeatureSelector(feature_df)
+# Use the select_features_mrmr method
+# selected_features_mrmr = feature_selector.select_features_mrmr()
+# print("Selected features (mRMR):", selected_features_mrmr)
+# Use the select_features_sequential method
+# selected_features_seq = feature_selector.select_features_sequential()
+# print("Selected features (sequential):", selected_features_seq)
