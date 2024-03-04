@@ -274,8 +274,8 @@ class DimensionalityReduction:
         """
         self.dataset = dataset
 
-        # Sample 5% of the data
-        self.dataset = self.dataset.sample(frac=0.05, random_state=42)
+        # Sample 20% of the data
+        self.dataset = self.dataset.sample(frac=0.2, random_state=42)
 
         self.data = StandardScaler().fit_transform(self.dataset.drop(columns=['HeartDisease']))
         self.target = self.dataset['HeartDisease']
@@ -735,18 +735,18 @@ path_cleaned = 'data/heart_2020_cleaned.csv'
 dataset_cleaned = pd.read_csv(path_cleaned)
 
 # Initialize DimensionalityReduction object with the dataset
-#dr = DimensionalityReduction(dataset_cleaned)
+dr = DimensionalityReduction(dataset_cleaned)
 
 # Compute and plot PCA projection
-#dr.plot_projection(dr.compute_pca(), 'PCA Projection')
+dr.plot_projection(dr.compute_pca(), 'PCA Projection')
 # Compute and plot LDA projection
 # dr.plot_projection(dr.compute_lda(), 'LDA Projection')
 # Compute and plot t-SNE projection
-#dr.plot_projection(dr.compute_tsne(), 't-SNE Projection')
+# dr.plot_projection(dr.compute_tsne(), 't-SNE Projection')
 # Compute and plot UMAP projection
-#dr.plot_projection(dr.compute_umap(), 'UMAP Projection')
+# dr.plot_projection(dr.compute_umap(), 'UMAP Projection')
 # Compute and plot LLE projection
-#dr.plot_projection(dr.compute_lle(), 'LLE Projection')
+# dr.plot_projection(dr.compute_lle(), 'LLE Projection')
 
 
 #%% 2- Hypothesis Testing
@@ -789,6 +789,10 @@ Asthma_with_HD = dataset_cleaned['Asthma'][dataset_cleaned['HeartDisease'] == 1]
 KD_with_HD = dataset_cleaned['KidneyDisease'][dataset_cleaned['HeartDisease'] == 1]
 SC_with_HD = dataset_cleaned['SkinCancer'][dataset_cleaned['HeartDisease'] == 1]
 
+With_HD = [BMI_with_HD, Smoke_with_HD, Alcohol_with_HD, Stroke_with_HD, PH_with_HD, MH_with_HD, DW_with_HD,
+           Sex_with_HD, AC_with_HD, Race_with_HD, Diabetic_with_HD, PA_with_HD, GH_with_HD, ST_with_HD,
+           Asthma_with_HD, KD_with_HD, SC_with_HD]
+
 # Column Data without Hearth Disease
 BMI_without_HD = dataset_cleaned['BMI'][dataset_cleaned['HeartDisease'] == 0]
 Smoke_without_HD = dataset_cleaned['Smoking'][dataset_cleaned['HeartDisease'] == 0]
@@ -807,6 +811,10 @@ ST_without_HD = dataset_cleaned['SleepTime'][dataset_cleaned['HeartDisease'] == 
 Asthma_without_HD = dataset_cleaned['Asthma'][dataset_cleaned['HeartDisease'] == 0]
 KD_without_HD = dataset_cleaned['KidneyDisease'][dataset_cleaned['HeartDisease'] == 0]
 SC_without_HD = dataset_cleaned['SkinCancer'][dataset_cleaned['HeartDisease'] == 0]
+
+Without_HD = [BMI_without_HD, Smoke_without_HD, Alcohol_without_HD, Stroke_without_HD, PH_without_HD,
+              MH_without_HD, DW_without_HD, Sex_without_HD, AC_without_HD, Race_without_HD, Diabetic_without_HD,
+              PA_without_HD, GH_without_HD, ST_without_HD, Asthma_without_HD, KD_without_HD, SC_without_HD]
 
 # Initialize the HypothesisTester class with the data
 tester = HypothesisTester()
@@ -838,6 +846,27 @@ tester.test_normality(['BMI_with_HD', 'Smoke_with_HD', 'Alcohol_with_HD', 'Strok
                 Race_without_HD, Diabetic_without_HD, PA_without_HD, GH_without_HD, ST_without_HD,
                 Asthma_without_HD, KD_without_HD, SC_without_HD)
 
+# Iterate over the indices of the arrays
+for i in range(len(With_HD)):
+
+    # Perform ANOVA test using arrays at index i
+    f_stat, p_val_anova = tester.unpaired_anova(With_HD[i], Without_HD[i])
+
+    # Print the results
+    print(f"\nUnpaired ANOVA between the array of {With_HD[i].name} with HeartDisease and the array without : ")
+    print("F-statistic:", f_stat)
+    print("p-value:", p_val_anova)
+
+# Iterate over the indices of the arrays
+for i in range(len(With_HD)):
+
+    # Perform Wilcoxon rank-sum test between Setosa and Versicolor species for sepal lengths
+    statistic, p_value = tester.wilcoxon_ranksum_test(With_HD[i], Without_HD[i])
+
+    # Print the results
+    print(f"\nWilcoxon rank-sum test between the array of {With_HD[i].name} with HeartDisease and the array without : ")
+    print("Test statistic:", statistic)
+    print("p-value:", p_value)
 
 #%% 3- Modeling
 
