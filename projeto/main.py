@@ -9,6 +9,10 @@ from sklearn.manifold import TSNE
 from sklearn.manifold import LocallyLinearEmbedding
 from sklearn.discriminant_analysis import LinearDiscriminantAnalysis
 import umap
+from scipy.stats import entropy
+from scipy.fftpack import fft
+from mrmr import mrmr_classif
+from sklearn.feature_selection import SequentialFeatureSelector
 
 
 class DataAnalysis:
@@ -440,6 +444,10 @@ class DimensionalityReduction:
         Initialize the DimensionalityReduction object with the dataset.
         """
         self.dataset = pd.read_csv(dataset_path)
+
+        # Sample 5% of the data
+        self.dataset = self.dataset.sample(frac=0.05, random_state=42)
+
         self.data = StandardScaler().fit_transform(self.dataset.drop(columns=['HeartDisease']))
         self.target = self.dataset['HeartDisease']
 
@@ -528,6 +536,208 @@ class DimensionalityReduction:
         """
         return LocallyLinearEmbedding(n_neighbors=n_neighbors, n_components=n_components).fit_transform(self.data)
 
+
+class FeatureExtractor:
+    """
+    A class to extract various types of features from a dataset.
+    """
+
+    def __init__(self, dataset_path):
+        """
+        Initializes the FeatureExtractor object.
+
+        Parameters:
+        - data (numpy.ndarray): The input dataset.
+        """
+        self.data = pd.read_csv(dataset_path)
+
+        self.feature_names = self.data.columns.tolist()
+        self.labels = self.data['HeartDisease'].unique().tolist()
+
+        self.all_features = []
+
+    def _statistical_features(self):
+        """
+        Computes statistical features per sample (row) of the dataset.
+
+        Returns:
+        - numpy.ndarray: An array containing statistical features per sample.
+        """
+        # Compute statistical features
+        mean = np.mean(self.data, axis=1)
+        std_dev = np.std(self.data, axis=1)
+        median = np.median(self.data, axis=1)
+        min_val = np.min(self.data, axis=1)
+        max_val = np.max(self.data, axis=1)
+        # Append feature names
+        self.feature_names.extend(['Mean'])
+        self.feature_names.extend(['Std_Dev'])
+        self.feature_names.extend(['Median'])
+        self.feature_names.extend(['Min'])
+        self.feature_names.extend(['Max'])
+        return np.column_stack((mean, std_dev, median, min_val, max_val))
+
+    def _pairwise_differences(self):
+        """
+        Computes the pairwise absolute differences between each pair of features per line.
+
+        Returns:
+        -------
+        pd.DataFrame:
+            A DataFrame containing pairwise absolute differences between each pair of features.
+            The DataFrame has (n-1) * n / 2 columns, where n is the number of features in the dataset.
+            Each row represents the absolute differences between pairs of features for a single data point.
+        """
+        # Calculate the number of features
+        num_features = self.data.shape[1]
+
+        # Initialize an empty DataFrame to store the pairwise differences
+        pairwise_diff_df = pd.DataFrame()
+
+        # Compute pairwise absolute differences for each pair of features
+        for i in range(num_features - 1):
+            for j in range(i + 1, num_features):
+                feature_name = f'pairwise_diff_{i + 1}_vs_{j + 1}'
+                pairwise_diff_df[feature_name] = np.abs(self.data[:, i] - self.data[:, j])
+                self.feature_names.extend([feature_name])
+
+        return pairwise_diff_df
+
+    def _frequency_domain_features(self):
+        """
+        Computes frequency domain features per sample (row) of the dataset using FFT.
+
+        Returns:
+        - numpy.ndarray: An array containing frequency domain features per sample.
+        """
+        # Compute frequency domain features using FFT
+        fft_result = fft(self.data)
+        # Append feature names
+        self.feature_names.extend(['FFT'])
+        return np.abs(fft_result).mean(axis=1).reshape(-1, 1)
+
+    def _entropy_features(self):
+        """
+        Computes entropy-based features per sample (row) of the dataset.
+
+        Returns:
+        - numpy.ndarray: An array containing entropy-based features per sample.
+        """
+        # Compute entropy-based features
+        entropy_vals = [entropy(self.data[i]) for i in range(len(self.data))]
+        # Append feature names
+        self.feature_names.extend(['Entropy'])
+        return np.array(entropy_vals).reshape(-1, 1)
+
+    def _area_based_features(self):
+        """
+        Calculate area-based features including petal area, sepal area, and petal to sepal area ratio.
+
+        Returns:
+        - numpy.ndarray: An array containing the calculated features.
+        """
+        petal_length = self.data[:, 2]
+        petal_width = self.data[:, 3]
+        sepal_length = self.data[:, 0]
+        sepal_width = self.data[:, 1]
+        # Calculate petal area (assuming petal shape is close to an ellipse)
+        petal_area = np.pi * (petal_length / 2) * (petal_width / 2)
+        # Calculate sepal area (assuming sepal shape is close to a rectangle)
+        sepal_area = sepal_length * sepal_width
+        # Calculate petal to sepal area ratio
+        ratio_petal_sepal_area = petal_area / sepal_area
+        # Add the features names
+        self.feature_names.extend(['Petal_area'])
+        self.feature_names.extend(['Sepal_area'])
+        self.feature_names.extend(['Ratio_petal_sepal_area'])
+        # Stack the calculated features horizontally
+        return np.column_stack((petal_area, sepal_area, ratio_petal_sepal_area))
+
+    def extract_features(self):
+        """
+        Extracts various types of features from the dataset.
+
+        Returns:
+        - pandas.DataFrame: A dataframe containing all extracted features.
+        """
+        # Extract and combine all features with the original features passed in data
+        self.all_features = np.hstack((self.data, self._statistical_features(), self._pairwise_differences(),
+                                  self._frequency_domain_features(), self._entropy_features(), self._area_based_features()))
+        # Create pandas dataframe
+        return pd.DataFrame(data=self.all_features, columns=self.feature_names)
+
+    def plot_all_features(self):
+        """
+        Plot histograms for all extracted features.
+        Each histogram is plotted separately for each feature, with optional coloring based on provided labels.
+        """
+        num_features = self.all_features.shape[1]
+        num_rows = int(np.ceil(np.sqrt(num_features)))
+        num_cols = int(np.ceil(num_features / num_rows))
+
+        fig, axes = plt.subplots(num_rows, num_cols, figsize=(15, 15))
+        fig.suptitle('All Features', fontsize=20)
+
+        for i in range(num_rows):
+            for j in range(num_cols):
+                idx = i * num_cols + j
+                if idx < num_features:
+                    ax = axes[i, j]
+                    ax.set_title(f'Feature {self.feature_names[idx]}', fontsize=12)
+                    ax.set_xlabel('Value', fontsize=10)
+                    ax.set_ylabel('Frequency', fontsize=10)
+                    ax.grid(True)
+                    if self.labels is not None:
+                        # Add a plot per feature
+                        unique_labels = np.unique(self.labels)
+                        for label in unique_labels:
+                            ax.hist(self.all_features[self.labels == label, idx], bins=20, alpha=0.7, label=label)
+                        ax.legend()
+
+        plt.tight_layout()
+        plt.show()
+
+
+class FeatureSelector:
+    def __init__(self, data, labels):
+        """
+        Initialize the FeatureSelector instance.
+
+        Parameters:
+        - data (numpy.ndarray): The input data array with shape (n_samples, n_features).
+        - labels (numpy.ndarray): The labels array with shape (n_samples,).
+        """
+        self.data = data
+        self.labels = labels
+
+    def select_features_mrmr(self, k=5):
+        """
+        Select features using mRMR (minimum Redundancy Maximum Relevance).
+
+        Parameters:
+        - k (int): The number of features to select. Default is 5.
+
+        Returns:
+        - List: The selected features as a list.
+        """
+        # Return the selected features
+        return mrmr_classif(X=self.data, y=self.labels, K=k)
+
+    def select_features_sequential(self, k=5):
+        """
+        Select features using sequential feature selection with LDA as the classifier.
+
+        Parameters:
+        - k (int): The number of features to select. Default is 5.
+
+        Returns:
+        - numpy.ndarray: The selected features array with shape (n_samples, k).
+        """
+        # Sequential forward feature selection
+        sfs = SequentialFeatureSelector(LinearDiscriminantAnalysis(), n_features_to_select=k, direction='forward').fit(self.data, self.labels)
+        # Return the selected features
+        return self.data.loc[:, sfs.get_support()].columns
+
 #%% 1- Pre Processing and EDA
 
 path = 'data/heart_2020.csv'
@@ -562,15 +772,25 @@ path_cleaned = 'data/heart_2020_cleaned.csv'
 dr = DimensionalityReduction(path_cleaned)
 
 # Compute and plot PCA projection
-dr.plot_projection(dr.compute_pca(), 'PCA Projection')
+# dr.plot_projection(dr.compute_pca(), 'PCA Projection')
 # Compute and plot LDA projection
-dr.plot_projection(dr.compute_lda(), 'LDA Projection')
+# dr.plot_projection(dr.compute_lda(), 'LDA Projection')
 # Compute and plot t-SNE projection
-#dr.plot_projection(dr.compute_tsne(), 't-SNE Projection')
+# dr.plot_projection(dr.compute_tsne(), 't-SNE Projection')
 # Compute and plot UMAP projection
-#dr.plot_projection(dr.compute_umap(), 'UMAP Projection')
+# dr.plot_projection(dr.compute_umap(), 'UMAP Projection')
 # Compute and plot LLE projection
-#dr.plot_projection(dr.compute_lle(), 'LLE Projection')
+# dr.plot_projection(dr.compute_lle(), 'LLE Projection')
+
+# Initialize FeatureExtractor object with the dataset
+extractor = FeatureExtractor(path_cleaned)
+
+# Extract features
+feature_df = extractor.extract_features()
+# Display the dataframe
+print(feature_df)
+# Plot the features per class
+extractor.plot_all_features()
 
 #%% 2- Hypothesis Testing
 
