@@ -187,6 +187,7 @@ class DataAnalysis:
             self.df = self.df.drop_duplicates(keep='first')
 
         print("\nDetecting outliers:")
+        features_to_delete = []
         for feature in self.df:
 
             # Check if the feature is binary (0 or 1)
@@ -209,6 +210,14 @@ class DataAnalysis:
                 median_value,
                 self.df[feature]
             )
+
+            # Verify if the feature after removing outliers has only one unique value
+            if len(self.df[feature].unique()) == 1:
+                print(f"Feature '{feature}' has only one unique value after removing outliers. Deleting it.")
+                features_to_delete.append(feature)
+
+        # Remove features with only one unique value
+        self.df.drop(columns=features_to_delete, inplace=True)
 
         self.df.to_csv('data/heart_2020_cleaned.csv', encoding='utf-8', index=False)
 
@@ -761,7 +770,6 @@ MH = dataset_cleaned['MentalHealth']
 DW = dataset_cleaned['DiffWalking']
 Sex = dataset_cleaned['Sex']
 AC = dataset_cleaned['AgeCategory']
-Race = dataset_cleaned['Race']
 Diabetic = dataset_cleaned['Diabetic']
 PA = dataset_cleaned['PhysicalActivity']
 GH = dataset_cleaned['GenHealth']
@@ -780,7 +788,6 @@ MH_with_HD = dataset_cleaned['MentalHealth'][dataset_cleaned['HeartDisease'] == 
 DW_with_HD = dataset_cleaned['DiffWalking'][dataset_cleaned['HeartDisease'] == 1]
 Sex_with_HD = dataset_cleaned['Sex'][dataset_cleaned['HeartDisease'] == 1]
 AC_with_HD = dataset_cleaned['AgeCategory'][dataset_cleaned['HeartDisease'] == 1]
-Race_with_HD = dataset_cleaned['Race'][dataset_cleaned['HeartDisease'] == 1]
 Diabetic_with_HD = dataset_cleaned['Diabetic'][dataset_cleaned['HeartDisease'] == 1]
 PA_with_HD = dataset_cleaned['PhysicalActivity'][dataset_cleaned['HeartDisease'] == 1]
 GH_with_HD = dataset_cleaned['GenHealth'][dataset_cleaned['HeartDisease'] == 1]
@@ -790,7 +797,7 @@ KD_with_HD = dataset_cleaned['KidneyDisease'][dataset_cleaned['HeartDisease'] ==
 SC_with_HD = dataset_cleaned['SkinCancer'][dataset_cleaned['HeartDisease'] == 1]
 
 With_HD = [BMI_with_HD, Smoke_with_HD, Alcohol_with_HD, Stroke_with_HD, PH_with_HD, MH_with_HD, DW_with_HD,
-           Sex_with_HD, AC_with_HD, Race_with_HD, Diabetic_with_HD, PA_with_HD, GH_with_HD, ST_with_HD,
+           Sex_with_HD, AC_with_HD, Diabetic_with_HD, PA_with_HD, GH_with_HD, ST_with_HD,
            Asthma_with_HD, KD_with_HD, SC_with_HD]
 
 # Column Data without Hearth Disease
@@ -803,7 +810,6 @@ MH_without_HD = dataset_cleaned['MentalHealth'][dataset_cleaned['HeartDisease'] 
 DW_without_HD = dataset_cleaned['DiffWalking'][dataset_cleaned['HeartDisease'] == 0]
 Sex_without_HD = dataset_cleaned['Sex'][dataset_cleaned['HeartDisease'] == 0]
 AC_without_HD = dataset_cleaned['AgeCategory'][dataset_cleaned['HeartDisease'] == 0]
-Race_without_HD = dataset_cleaned['Race'][dataset_cleaned['HeartDisease'] == 0]
 Diabetic_without_HD = dataset_cleaned['Diabetic'][dataset_cleaned['HeartDisease'] == 0]
 PA_without_HD = dataset_cleaned['PhysicalActivity'][dataset_cleaned['HeartDisease'] == 0]
 GH_without_HD = dataset_cleaned['GenHealth'][dataset_cleaned['HeartDisease'] == 0]
@@ -813,7 +819,7 @@ KD_without_HD = dataset_cleaned['KidneyDisease'][dataset_cleaned['HeartDisease']
 SC_without_HD = dataset_cleaned['SkinCancer'][dataset_cleaned['HeartDisease'] == 0]
 
 Without_HD = [BMI_without_HD, Smoke_without_HD, Alcohol_without_HD, Stroke_without_HD, PH_without_HD,
-              MH_without_HD, DW_without_HD, Sex_without_HD, AC_without_HD, Race_without_HD, Diabetic_without_HD,
+              MH_without_HD, DW_without_HD, Sex_without_HD, AC_without_HD, Diabetic_without_HD,
               PA_without_HD, GH_without_HD, ST_without_HD, Asthma_without_HD, KD_without_HD, SC_without_HD]
 
 # Initialize the HypothesisTester class with the data
@@ -821,35 +827,37 @@ tester = HypothesisTester()
 
 # Perform normality analysis, first by visual checking using a Q-Q plot and then by normality test
 tester.qq_plots(['BMI_with_HD', 'Smoke_with_HD', 'Alcohol_with_HD', 'Stroke_with_HD', 'PH_with_HD', 'MH_with_HD', 'DW_with_HD',
-                'Sex_with_HD', 'AC_with_HD', 'Race_with_HD', 'Diabetic_with_HD', 'PA_with_HD', 'GH_with_HD', 'ST_with_HD',
+                'Sex_with_HD', 'AC_with_HD', 'Diabetic_with_HD', 'PA_with_HD', 'GH_with_HD', 'ST_with_HD',
                 'Asthma_with_HD', 'KD_with_HD', 'SC_with_HD', 'BMI_without_HD', 'Smoke_without_HD', 'Alcohol_without_HD',
                 'Stroke_without_HD', 'PH_without_HD', 'MH_without_HD', 'DW_without_HD', 'Sex_without_HD', 'AC_without_HD',
-                'Race_without_HD', 'Diabetic_without_HD', 'PA_without_HD', 'GH_without_HD', 'ST_without_HD',
+                'Diabetic_without_HD', 'PA_without_HD', 'GH_without_HD', 'ST_without_HD',
                 'Asthma_without_HD', 'KD_without_HD', 'SC_without_HD'], BMI_with_HD, Smoke_with_HD, Alcohol_with_HD,
                 Stroke_with_HD, PH_with_HD, MH_with_HD, DW_with_HD,
-                Sex_with_HD, AC_with_HD, Race_with_HD, Diabetic_with_HD, PA_with_HD, GH_with_HD, ST_with_HD,
+                Sex_with_HD, AC_with_HD, Diabetic_with_HD, PA_with_HD, GH_with_HD, ST_with_HD,
                 Asthma_with_HD, KD_with_HD, SC_with_HD, BMI_without_HD, Smoke_without_HD, Alcohol_without_HD,
                 Stroke_without_HD, PH_without_HD, MH_without_HD, DW_without_HD, Sex_without_HD, AC_without_HD,
-                Race_without_HD, Diabetic_without_HD, PA_without_HD, GH_without_HD, ST_without_HD,
+                Diabetic_without_HD, PA_without_HD, GH_without_HD, ST_without_HD,
                 Asthma_without_HD, KD_without_HD, SC_without_HD)
 
 tester.test_normality(['BMI_with_HD', 'Smoke_with_HD', 'Alcohol_with_HD', 'Stroke_with_HD', 'PH_with_HD', 'MH_with_HD', 'DW_with_HD',
-                'Sex_with_HD', 'AC_with_HD', 'Race_with_HD', 'Diabetic_with_HD', 'PA_with_HD', 'GH_with_HD', 'ST_with_HD',
+                'Sex_with_HD', 'AC_with_HD','Diabetic_with_HD', 'PA_with_HD', 'GH_with_HD', 'ST_with_HD',
                 'Asthma_with_HD', 'KD_with_HD', 'SC_with_HD', 'BMI_without_HD', 'Smoke_without_HD', 'Alcohol_without_HD',
                 'Stroke_without_HD', 'PH_without_HD', 'MH_without_HD', 'DW_without_HD', 'Sex_without_HD', 'AC_without_HD',
-                'Race_without_HD', 'Diabetic_without_HD', 'PA_without_HD', 'GH_without_HD', 'ST_without_HD',
+                'Diabetic_without_HD', 'PA_without_HD', 'GH_without_HD', 'ST_without_HD',
                 'Asthma_without_HD', 'KD_without_HD', 'SC_without_HD'], BMI_with_HD, Smoke_with_HD, Alcohol_with_HD,
                 Stroke_with_HD, PH_with_HD, MH_with_HD, DW_with_HD,
-                Sex_with_HD, AC_with_HD, Race_with_HD, Diabetic_with_HD, PA_with_HD, GH_with_HD, ST_with_HD,
+                Sex_with_HD, AC_with_HD, Diabetic_with_HD, PA_with_HD, GH_with_HD, ST_with_HD,
                 Asthma_with_HD, KD_with_HD, SC_with_HD, BMI_without_HD, Smoke_without_HD, Alcohol_without_HD,
                 Stroke_without_HD, PH_without_HD, MH_without_HD, DW_without_HD, Sex_without_HD, AC_without_HD,
-                Race_without_HD, Diabetic_without_HD, PA_without_HD, GH_without_HD, ST_without_HD,
+                Diabetic_without_HD, PA_without_HD, GH_without_HD, ST_without_HD,
                 Asthma_without_HD, KD_without_HD, SC_without_HD)
+
+#------------------------------TESTES DE ARRAYS DA MESMA FEATURE COM E SEM DOENÇA CARDIACA------------------------------
 
 # Iterate over the indices of the arrays
 for i in range(len(With_HD)):
 
-    # Perform ANOVA test using arrays at index i
+    # Perform ANOVA test
     f_stat, p_val_anova = tester.unpaired_anova(With_HD[i], Without_HD[i])
 
     # Print the results
@@ -860,13 +868,64 @@ for i in range(len(With_HD)):
 # Iterate over the indices of the arrays
 for i in range(len(With_HD)):
 
-    # Perform Wilcoxon rank-sum test between Setosa and Versicolor species for sepal lengths
+    # Perform Wilcoxon rank-sum test
     statistic, p_value = tester.wilcoxon_ranksum_test(With_HD[i], Without_HD[i])
 
     # Print the results
     print(f"\nWilcoxon rank-sum test between the array of {With_HD[i].name} with HeartDisease and the array without : ")
     print("Test statistic:", statistic)
     print("p-value:", p_value)
+
+
+# Iterate over the indices of the arrays
+for i in range(len(With_HD)):
+
+    # Perform Kruskal-Wallis test
+    statistic, p_value = tester.kruskal_wallis_test(With_HD[i], Without_HD[i])
+
+    # Print the results
+    print(f"\nKruskal-Wallis test between the array of {With_HD[i].name} with HeartDisease and the array without:")
+    print("Test statistic:", statistic)
+    print("p-value:", p_value)
+
+# ---------------------------------------PERCISO ARRAYS DA MESMA DIMENSÃO ---------------------------------------------
+
+## Iterate over the indices of the arrays
+# for i in range(len(With_HD)):
+#    # Perform unpaired t-test
+#    t_stat, p_val = tester.unpaired_t_test(With_HD[i], Without_HD[i])
+#    print(f"\nUnpaired t-test between the array of {With_HD[i].name} with HeartDisease and the array without:")
+#    print("t-statistic:", t_stat)
+#    print("p-value:", p_val)
+
+## Iterate over the indices of the arrays
+#for i in range(len(With_HD)):
+#
+#    # Perform paired t-test
+#    t_stat, p_val = tester.paired_t_test(With_HD[i], Without_HD[i])
+#    print(f"\nPaired t-test between the array of {With_HD[i].name} with HeartDisease and the array without:")
+#    print("t-statistic:", t_stat)
+#    print("p-value:", p_val)
+
+## Iterate over the indices of the arrays
+#for i in range(len(With_HD)):
+#
+#    # Perform Wilcoxon signed-rank test
+#    statistic, p_value = tester.wilcoxon_signedrank_test(With_HD[i], Without_HD[i])
+#    print(f"\nWilcoxon signed-rank test between the array of {With_HD[i].name} with HeartDisease and the array without:")
+#    print("Test statistic:", statistic)
+#    print("p-value:", p_value)
+
+## Iterate over the indices of the arrays
+#for i in range(len(With_HD)):
+#
+#    # Perform Friedman test
+#    statistic, p_value = tester.friedman_test(With_HD[i], Without_HD[i])
+#
+#    # Print the results
+#    print(f"\nFriedman test between the array of {With_HD[i].name} with HeartDisease and the array without:")
+#    print("Test statistic:", statistic)
+#    print("p-value:", p_value)
 
 #%% 3- Modeling
 
