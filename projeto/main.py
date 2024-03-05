@@ -51,6 +51,13 @@ class DataAnalysis:
 
         self.valid_plot_types = ['count', 'hist', 'kde', 'correlation', 'box', 'split_violin']
 
+        self.numerical_features = ["AgeCategory", "Race", "GenHealth",
+                                   "BMI", "SleepTime"]
+        self.categorical_features = ["Smoking", "AlcoholDrinking", "Stroke",
+                                     "DiffWalking", "Sex", "Diabetic",
+                                     "PhysicalActivity", "Asthma",
+                                     "KidneyDisease", "SkinCancer"]
+
     def describe_variables(self):
         print("\nInformation of Data:")
         print(self.df.info())
@@ -156,18 +163,6 @@ class DataAnalysis:
         self.race_category()
         self.genHealth_category()
 
-        self.bmi_class()
-        self.sleep_class()
-        self.badHealth_feature()
-
-        self.numerical_features = ["AgeCategory", "Race", "GenHealth",
-                                   "BMI", "BMIClass", "SleepTime",
-                                   "SleepClass", "BadHealthScore"]
-        self.categorical_features = ["Smoking", "AlcoholDrinking", "Stroke",
-                                     "DiffWalking", "Sex", "Diabetic",
-                                     "PhysicalActivity", "Asthma",
-                                     "KidneyDisease", "SkinCancer"]
-
         print("\nProcessed Dataset:")
         print(self.df.info())
 
@@ -192,7 +187,7 @@ class DataAnalysis:
 
             # Check if the feature is binary (0 or 1)
             if set(self.df[feature]) == {0, 1}:
-                # Skip replacing outliers for binary features
+                # Skip processing binary features
                 continue
 
             q1 = self.df[feature].quantile(0.25)
@@ -200,16 +195,11 @@ class DataAnalysis:
             iqr = q3 - q1
             lower_bound = q1 - 1.5 * iqr
             upper_bound = q3 + 1.5 * iqr
-            outliers = self.df[(self.df[feature] < lower_bound) | (self.df[feature] > upper_bound)]
-            print(f"Outliers in '{feature}':\n{outliers}" if not outliers.empty else f"No outliers in '{feature}'.")
+            outliers_indices = self.df[(self.df[feature] < lower_bound) | (self.df[feature] > upper_bound)].index
 
-            # Replace outliers with median value
-            median_value = self.df[feature].median()
-            self.df[feature] = np.where(
-                (self.df[feature] < lower_bound) | (self.df[feature] > upper_bound),
-                median_value,
-                self.df[feature]
-            )
+            print(f"Outliers in '{feature}'." if not outliers_indices.empty else f"No outliers in '{feature}'.")
+
+            self.df.drop(outliers_indices, inplace=True)
 
             # Verify if the feature after removing outliers has only one unique value
             if len(self.df[feature].unique()) == 1:
@@ -257,7 +247,7 @@ class DataAnalysis:
                     plt.show()
                 if plot_type == 'box' and feature in self.numerical_features:
                     fig, ax = plt.subplots(figsize=(8, 6))
-                    sns.boxplot(x=self.target, y=feature, data=self.df, ax=ax)
+                    sns.boxplot(x='AlcoholDrinking', y=feature, data=self.df, ax=ax, hue=self.target)
                     ax.set_title(f'Boxplot of {feature} by {self.target}')
                     plt.show()
                 if plot_type == 'split_violin' and feature in self.numerical_features:
