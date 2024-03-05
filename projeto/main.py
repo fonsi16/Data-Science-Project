@@ -62,6 +62,9 @@ class DataAnalysis:
         print("\nInformation of Data:")
         print(self.df.info())
 
+        print("\nUnique values of features:")
+        print(self.df.nunique())
+
         print("\nStatistical distribution of each variable:")
         print(self.df.describe())
 
@@ -70,10 +73,6 @@ class DataAnalysis:
         # Display the range of values for each variable without considering the class label
         print("\nRange of values for each variable:")
         print(self.df.max() - self.df.min())
-
-        # Display the range of values for each variable per class label
-        print("\nRange of values for each variable per class label:")
-        #print(self.df_with_labels.max() - self.df_with_labels.min())
 
     """
         1 -> severe thinness
@@ -85,6 +84,7 @@ class DataAnalysis:
         7 -> obese class 2
         8 -> obese class 3
     """
+
     def bmi_class(self):
         bmi = self.df["BMI"]
         condition = [bmi < 16, bmi < 17, bmi < 18.5, bmi < 25, bmi < 30, bmi < 35, bmi < 40, bmi >= 40]
@@ -141,8 +141,6 @@ class DataAnalysis:
 
         self.df["BadHealthScore"] = condition
 
-
-
     def process_data(self):
 
         # Map categorical features to numerical values
@@ -152,7 +150,8 @@ class DataAnalysis:
         self.df["Stroke"] = self.df["Stroke"].map({"No": 0, "Yes": 1})
         self.df["DiffWalking"] = self.df["DiffWalking"].map({"No": 0, "Yes": 1})
         self.df["Sex"] = self.df["Sex"].map({"Female": 0, "Male": 1})
-        self.df["Diabetic"] = self.df["Diabetic"].map({"No": 0, "No, borderline diabetes": 0, "Yes (during pregnancy)": 1, "Yes": 1})
+        self.df["Diabetic"] = self.df["Diabetic"].map(
+            {"No": 0, "No, borderline diabetes": 0, "Yes (during pregnancy)": 1, "Yes": 1})
         self.df["PhysicalActivity"] = self.df["PhysicalActivity"].map({"No": 0, "Yes": 1})
         self.df["Asthma"] = self.df["Asthma"].map({"No": 0, "Yes": 1})
         self.df["KidneyDisease"] = self.df["KidneyDisease"].map({"No": 0, "Yes": 1})
@@ -170,10 +169,6 @@ class DataAnalysis:
 
         print("\nOriginal Dataset:")
         print(self.df.info)
-
-        # Original Data Plots
-        #data_analysis_instance.plots(['kde'])
-        data_analysis_instance.plots(['correlation'])
 
         print("Missing values:\n", self.df.isnull().sum())
         print("Duplicate Rows:", self.df.duplicated().sum())
@@ -208,8 +203,6 @@ class DataAnalysis:
 
         # Remove features with only one unique value
         self.df.drop(columns=features_to_delete, inplace=True)
-
-        self.df.to_csv('data/heart_2020_cleaned.csv', encoding='utf-8', index=False)
 
         print("\nCleansed Dataset:")
         print(self.df.info)
@@ -258,12 +251,17 @@ class DataAnalysis:
 
         if 'correlation' in plot_types:
             correlation = self.df.corr().round(2)
+            heartdisease_correlation = correlation['HeartDisease'].sort_values(ascending=False)
+
             plt.figure(figsize=(15, 12))
             sns.heatmap(correlation, annot=True, cmap='YlOrBr', annot_kws={'size': 8})
             plt.title('Correlation Heatmap')
             plt.xticks(rotation=45)
             plt.tight_layout()
             plt.show()
+
+            print("\nCorrelation of the features with Heart Disease:\n")
+            print(heartdisease_correlation)
 
 
 class DimensionalityReduction:
