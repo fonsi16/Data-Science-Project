@@ -3,6 +3,8 @@ import pandas as pd
 import numpy as np
 import seaborn as sns
 import matplotlib.pyplot as plt
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.inspection import permutation_importance
 from sklearn.preprocessing import StandardScaler
 from sklearn.decomposition import PCA
 from sklearn.manifold import TSNE
@@ -19,6 +21,71 @@ from sklearn.preprocessing import OneHotEncoder, LabelEncoder
 import statsmodels.api as sm
 import statsmodels.stats.api as sms
 from statsmodels.formula.api import ols
+
+class DataLoader:
+    """
+    Generic Class responsible for loading the dataset and splitting it into training and testing sets.
+
+    Attributes:
+        filename (str): The filename of the dataset to load.
+        test_size (float): The proportion of the dataset to include in the test split.
+        random_state (int or None): The seed used by the random number generator for reproducibility.
+
+    Attributes (after loading the data):
+        data_train (DataFrame): The training data features.
+        labels_train (Series): The training data labels.
+        data_test (DataFrame): The testing data features.
+        labels_test (Series): The testing data labels.
+
+    Methods:
+        _load_data(): Loads the dataset, splits it into training and testing sets,
+                      and assigns the data and labels to the appropriate attributes.
+    """
+
+    def __init__(self, filename, target):
+        """
+        Initializes the DataLoader with the filename of the dataset,
+        the proportion of data to include in the test split,
+        and the random state for reproducibility.
+        """
+        self.filename = filename
+
+        self.labels = None
+        self.numerical_features = []
+        self.categorical_features = []
+
+        # Load data
+        self._load_data(target)
+
+    def _load_data(self, target):
+        """
+        Loads the dataset from the specified filename,
+        splits it into training and testing sets using train_test_split(),
+        and assigns the data and labels to the appropriate attributes.
+        """
+        try:
+            # Load the dataset
+            df = pd.read_csv(self.filename)
+
+            df.target = target
+
+            # Validate if the target column exists in the dataset
+            if target not in df.columns:
+                raise ValueError(f"Target column '{target}' not found in the dataset.")
+
+            self.labels = df[target]
+
+            # Iterate over columns and categorize them
+            for column in df.columns:
+                if len(df[column].unique()) > 2:
+                    self.numerical_features.append(column)
+                else:
+                    self.categorical_features.append(column)
+
+            print("Data loaded successfully.")
+
+        except FileNotFoundError:
+            print("File not found. Please check the file path.")
 
 
 class DataAnalysis:
@@ -49,7 +116,7 @@ class DataAnalysis:
         # Concatenate the labels to the dataset
         self.df_with_labels = pd.concat([self.df, self.labels], axis=1)
 
-        self.valid_plot_types = ['count', 'hist', 'kde', 'correlation', 'box', 'split_violin']
+        self.valid_plot_types = ['count', 'hist', 'kde', 'correlation', 'box', 'split_violin', 'barh']
 
         self.numerical_features = ["AgeCategory", "Race", "GenHealth",
                                    "BMI", "SleepTime"]
@@ -168,9 +235,13 @@ class DataAnalysis:
     def data_cleaning(self):
 
         print("\nOriginal Dataset:")
-        print(self.df.info)
+        print(self.df.info())
 
         print("Missing values:\n", self.df.isnull().sum())
+
+        if self.df.isnull().sum().sum() > 0:
+            self.df = self.df.dropna()
+
         print("Duplicate Rows:", self.df.duplicated().sum())
 
         if self.df.duplicated().sum() > 0:
@@ -264,6 +335,25 @@ class DataAnalysis:
 
             print("\nCorrelation of the features with Heart Disease:\n")
             print(heartdisease_correlation)
+
+        if 'barh' in plot_types:
+            # Train a RandomForestClassifier model
+            clf = RandomForestClassifier()
+            X = self.df.drop(columns=[self.target])  # Features
+            y = self.df[self.target]  # Target variable
+            clf.fit(X, y)
+
+            # Calculate permutation importance
+            result = permutation_importance(clf, X, y, n_repeats=10, random_state=42, n_jobs=-1)
+            perm_sorted_idx = result.importances_mean.argsort()
+
+            # Visualize feature importance
+            plt.figure(figsize=(10, 8))
+            sns.barplot(x=result.importances_mean[perm_sorted_idx], y=X.columns[perm_sorted_idx])
+            plt.xlabel('Permutation Importance')
+            plt.ylabel('Features')
+            plt.title('Permutation Importance')
+            plt.show()
 
 
 class DimensionalityReduction:
@@ -712,21 +802,6 @@ class FeatureSelector:
         # Return the selected features
         return mrmr_classif(X=self.data, y=self.labels, K=k)
 
-    def select_features_sequential(self, k=5):
-        """
-        Select features using sequential feature selection with LDA as the classifier.
-
-        Parameters:
-        - k (int): The number of features to select. Default is 5.
-
-        Returns:
-        - numpy.ndarray: The selected features array with shape (n_samples, k).
-        """
-        # Sequential forward feature selection
-        sfs = SequentialFeatureSelector(LinearDiscriminantAnalysis(), n_features_to_select=k, direction='forward').fit(self.data, self.labels)
-        # Return the selected features
-        return self.data.loc[:, sfs.get_support()].columns
-
 
 #%% 1- Pre Processing and EDA
 
@@ -749,21 +824,17 @@ dataset_cleaned = data_analysis_instance.data_cleaning()
 dataset_cleaned.to_csv('data/heart_2020_cleaned.csv', index=False)
 
 # Plots after the cleansing and processing
-data_analysis_instance.plots(['correlation'])
+data_analysis_instance.plots(['correlation', 'barh'])
 
 # Initialize DimensionalityReduction object with the dataset
 dr = DimensionalityReduction(dataset_cleaned)
 
 # Compute and plot PCA projection
-# dr.plot_projection(dr.compute_pca(), 'PCA Projection')
-# Compute and plot LDA projection
-# dr.plot_projection(dr.compute_lda(), 'LDA Projection')
+dr.plot_projection(dr.compute_pca(), 'PCA Projection')
 # Compute and plot t-SNE projection
-# dr.plot_projection(dr.compute_tsne(), 't-SNE Projection')
+dr.plot_projection(dr.compute_tsne(), 't-SNE Projection')
 # Compute and plot UMAP projection
-# dr.plot_projection(dr.compute_umap(), 'UMAP Projection')
-# Compute and plot LLE projection
-# dr.plot_projection(dr.compute_lle(), 'LLE Projection')
+dr.plot_projection(dr.compute_umap(), 'UMAP Projection')
 
 
 #%% 2- Hypothesis Testing
@@ -953,6 +1024,3 @@ feature_selector = FeatureSelector(feature_data, feature_labels)
 # Use the select_features_mrmr method
 selected_features_mrmr = feature_selector.select_features_mrmr()
 print("Selected features (mRMR):", selected_features_mrmr)
-# Use the select_features_sequential method
-selected_features_seq = feature_selector.select_features_sequential()
-print("Selected features (sequential):", selected_features_seq)
