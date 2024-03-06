@@ -165,7 +165,7 @@ class DataAnalysis:
         print("\nProcessed Dataset:")
         print(self.df.info())
 
-    def assess_quality(self):
+    def data_cleaning(self):
 
         print("\nOriginal Dataset:")
         print(self.df.info)
@@ -206,6 +206,8 @@ class DataAnalysis:
 
         print("\nCleansed Dataset:")
         print(self.df.info)
+
+        return self.df
 
     def plots(self, plot_types):
         for plot_type in plot_types:
@@ -361,165 +363,6 @@ class DimensionalityReduction:
         - lle_projection: The projected data using LLE.
         """
         return LocallyLinearEmbedding(n_neighbors=n_neighbors, n_components=n_components).fit_transform(self.data)
-
-
-class FeatureExtractor:
-    """
-    A class to extract various types of features from a dataset.
-    """
-
-    def __init__(self, dataset_path):
-        """
-        Initializes the FeatureExtractor object.
-
-        Parameters:
-        - data (numpy.ndarray): The input dataset.
-        """
-        self.data = pd.read_csv(dataset_path)
-
-        self.feature_names = self.data.columns.tolist()
-        self.labels = self.data['HeartDisease'].unique().tolist()
-
-        self.all_features = []
-
-    def _statistical_features(self):
-        """
-        Computes statistical features per sample (row) of the dataset.
-
-        Returns:
-        - numpy.ndarray: An array containing statistical features per sample.
-        """
-        # Compute statistical features
-        mean = np.mean(self.data, axis=1)
-        std_dev = np.std(self.data, axis=1)
-        median = np.median(self.data, axis=1)
-        min_val = np.min(self.data, axis=1)
-        max_val = np.max(self.data, axis=1)
-        # Append feature names
-        self.feature_names.extend(['Mean'])
-        self.feature_names.extend(['Std_Dev'])
-        self.feature_names.extend(['Median'])
-        self.feature_names.extend(['Min'])
-        self.feature_names.extend(['Max'])
-        return np.column_stack((mean, std_dev, median, min_val, max_val))
-
-    def _pairwise_differences(self):
-        num_features = self.data.shape[1]
-        pairwise_diff_df = pd.DataFrame()
-
-        for i in range(num_features - 1):
-            for j in range(i + 1, num_features):
-                feature_name = f'pairwise_diff_{i + 1}_vs_{j + 1}'
-                pairwise_diff_df[feature_name] = np.abs(self.data.iloc[:, i] - self.data.iloc[:, j])
-                self.feature_names.append(feature_name)
-
-        return pairwise_diff_df
-
-    def _frequency_domain_features(self):
-        """
-        Computes frequency domain features per sample (row) of the dataset using FFT.
-
-        Returns:
-        - numpy.ndarray: An array containing frequency domain features per sample.
-        """
-        # Compute frequency domain features using FFT
-        fft_result = fft(self.data)
-        # Append feature names
-        self.feature_names.extend(['FFT'])
-        return np.abs(fft_result).mean(axis=1).reshape(-1, 1)
-
-    def _entropy_features(self):
-
-        # Compute entropy-based features for each row
-        entropy_vals = np.array([entropy(row) for idx, row in self.data.iterrows()])
-
-        # Append feature names
-        self.feature_names.append('Entropy')
-
-        return entropy_vals.reshape(-1, 1)
-
-    def extract_features(self):
-        """
-        Extracts various types of features from the dataset.
-
-        Returns:
-        - pandas.DataFrame: A dataframe containing all extracted features.
-        """
-        # Extract and combine all features with the original features passed in data
-        self.all_features = np.hstack((self.data, self._statistical_features(), self._pairwise_differences(),
-                                  self._frequency_domain_features(), self._entropy_features()))
-        # Create pandas dataframe
-        return pd.DataFrame(data=self.all_features, columns=self.feature_names)
-
-    def plot_all_features(self):
-        """
-        Plot histograms for all extracted features.
-        Each histogram is plotted separately for each feature, with optional coloring based on provided labels.
-        """
-        num_features = self.all_features.shape[1]
-        num_cols = 4  # Adjust the number of columns to control subplot arrangement
-        num_rows = int(np.ceil(num_features / num_cols))
-
-        fig, axes = plt.subplots(num_rows, num_cols, figsize=(15, 3 * num_rows))
-        fig.suptitle('All Features', fontsize=20)
-
-        for idx, ax in enumerate(axes.flat):
-            if idx < num_features:
-                ax.set_title(f'Feature {self.feature_names[idx]}', fontsize=12)
-                ax.set_xlabel('Value', fontsize=10)
-                ax.set_ylabel('Frequency', fontsize=10)
-                ax.grid(True)
-
-                if self.labels is not None:
-                    # Add a plot per feature and label
-                    for label in self.labels:
-                        mask = np.array(self.data['HeartDisease'] == label)
-                        ax.hist(self.all_features[mask, idx], bins=20, alpha=0.7, label=label)
-                    ax.legend()
-
-        plt.tight_layout()
-        plt.show()
-
-
-class FeatureSelector:
-    def __init__(self, data):
-        """
-        Initialize the FeatureSelector instance.
-
-        Parameters:
-        - data (numpy.ndarray): The input data array with shape (n_samples, n_features).
-        - labels (numpy.ndarray): The labels array with shape (n_samples,).
-        """
-        self.data = data
-        self.labels = self.data.iloc[:, 0].unique().tolist()
-
-    def select_features_mrmr(self, k=5):
-        """
-        Select features using mRMR (minimum Redundancy Maximum Relevance).
-
-        Parameters:
-        - k (int): The number of features to select. Default is 5.
-
-        Returns:
-        - List: The selected features as a list.
-        """
-        # Return the selected features
-        return mrmr_classif(X=self.data, y=self.labels, K=k)
-
-    def select_features_sequential(self, k=5):
-        """
-        Select features using sequential feature selection with LDA as the classifier.
-
-        Parameters:
-        - k (int): The number of features to select. Default is 5.
-
-        Returns:
-        - numpy.ndarray: The selected features array with shape (n_samples, k).
-        """
-        # Sequential forward feature selection
-        sfs = SequentialFeatureSelector(LinearDiscriminantAnalysis(), n_features_to_select=k, direction='forward').fit(self.data, self.labels)
-        # Return the selected features
-        return self.data.loc[:, sfs.get_support()].columns
 
 
 class HypothesisTester:
@@ -707,6 +550,184 @@ class HypothesisTester:
             print(f'Shapiro-Wilk test - Test statistic: {shapiro_result.statistic}, p-value: {shapiro_result.pvalue}')
         return results
 
+
+class FeatureExtractor:
+    """
+    A class to extract various types of features from a dataset.
+    """
+
+    def __init__(self, dataset):
+        """
+        Initializes the FeatureExtractor object.
+
+        Parameters:
+        - data (numpy.ndarray): The input dataset.
+        """
+        self.data = dataset
+
+        self.feature_names = self.data.columns.tolist()
+        self.labels = self.data['HeartDisease'].unique().tolist()
+
+        self.all_features = []
+
+    def _statistical_features(self):
+        """
+        Computes statistical features per sample (row) of the dataset.
+
+        Returns:
+        - numpy.ndarray: An array containing statistical features per sample.
+        """
+        # Compute statistical features
+        mean = np.mean(self.data, axis=1)
+        std_dev = np.std(self.data, axis=1)
+        median = np.median(self.data, axis=1)
+        min_val = np.min(self.data, axis=1)
+        max_val = np.max(self.data, axis=1)
+        # Append feature names
+        self.feature_names.extend(['Mean'])
+        self.feature_names.extend(['Std_Dev'])
+        self.feature_names.extend(['Median'])
+        self.feature_names.extend(['Min'])
+        self.feature_names.extend(['Max'])
+        return np.column_stack((mean, std_dev, median, min_val, max_val))
+
+    def _pairwise_differences(self):
+        num_features = self.data.shape[1]
+        pairwise_diff_df = pd.DataFrame()
+
+        for i in range(num_features - 1):
+            for j in range(i + 1, num_features):
+                feature_name = f'pairwise_diff_{i + 1}_vs_{j + 1}'
+                pairwise_diff_df[feature_name] = np.abs(self.data.iloc[:, i] - self.data.iloc[:, j])
+                self.feature_names.append(feature_name)
+
+        return pairwise_diff_df
+
+    def _frequency_domain_features(self):
+        """
+        Computes frequency domain features per sample (row) of the dataset using FFT.
+
+        Returns:
+        - numpy.ndarray: An array containing frequency domain features per sample.
+        """
+        # Compute frequency domain features using FFT
+        fft_result = fft(self.data)
+        # Append feature names
+        self.feature_names.extend(['FFT'])
+        return np.abs(fft_result).mean(axis=1).reshape(-1, 1)
+
+    def _entropy_features(self):
+
+        # Compute entropy-based features for each row
+        entropy_vals = np.array([entropy(row) for idx, row in self.data.iterrows()])
+
+        # Append feature names
+        self.feature_names.append('Entropy')
+
+        return entropy_vals.reshape(-1, 1)
+
+    def extract_features(self):
+        """
+        Extracts various types of features from the dataset.
+
+        Returns:
+        - pandas.DataFrame: A dataframe containing all extracted features.
+        """
+        # Extract and combine all features with the original features passed in data
+        self.all_features = np.hstack((self.data, self._statistical_features(), self._pairwise_differences(),
+                                  self._frequency_domain_features(), self._entropy_features()))
+        # Create pandas dataframe
+        return pd.DataFrame(data=self.all_features, columns=self.feature_names)
+
+    def plot_all_features(self):
+        """
+        Plot histograms for all extracted features.
+        Each histogram is plotted separately for each feature, with optional coloring based on provided labels.
+        """
+        num_features = self.all_features.shape[1]
+        num_cols = 4  # Adjust the number of columns to control subplot arrangement
+        num_rows = int(np.ceil(num_features / num_cols))
+
+        fig, axes = plt.subplots(num_rows, num_cols, figsize=(15, 3 * num_rows))
+        fig.suptitle('All Features', fontsize=20)
+
+        for idx, ax in enumerate(axes.flat):
+            if idx < num_features:
+                ax.set_title(f'Feature {self.feature_names[idx]}', fontsize=12)
+                ax.set_xlabel('Value', fontsize=10)
+                ax.set_ylabel('Frequency', fontsize=10)
+                ax.grid(True)
+
+                if self.labels is not None:
+                    # Add a plot per feature and label
+                    for label in self.labels:
+                        mask = np.array(self.data['HeartDisease'] == label)
+                        ax.hist(self.all_features[mask, idx], bins=20, alpha=0.7, label=label)
+                    ax.legend()
+
+        plt.tight_layout()
+        plt.show()
+
+
+class FeatureSelector:
+    def __init__(self, data, labels):
+        """
+        Initialize the FeatureSelector instance.
+
+        Parameters:
+        - data (numpy.ndarray): The input data array with shape (n_samples, n_features).
+        - labels (numpy.ndarray): The labels array with shape (n_samples,).
+        """
+        self.data = data
+        self.labels = labels
+
+        self._sanity_check()
+
+    def _sanity_check(self):
+        # Perform basic sanity checks
+        print("Dataset Shape:", self.data.shape)
+
+        # Check for missing values
+        print("\nMissing Values:")
+        print(self.data.isnull().sum())
+
+        # Check data types
+        print("\nData Types:")
+        print(self.data.dtypes)
+
+        # Check for zero variance features
+        zero_variance_features = self.data.columns[self.data.var() == 0]
+        print("\nZero Variance Features:", zero_variance_features)
+
+    def select_features_mrmr(self, k=5):
+        """
+        Select features using mRMR (minimum Redundancy Maximum Relevance).
+
+        Parameters:
+        - k (int): The number of features to select. Default is 5.
+
+        Returns:
+        - List: The selected features as a list.
+        """
+        # Return the selected features
+        return mrmr_classif(X=self.data, y=self.labels, K=k)
+
+    def select_features_sequential(self, k=5):
+        """
+        Select features using sequential feature selection with LDA as the classifier.
+
+        Parameters:
+        - k (int): The number of features to select. Default is 5.
+
+        Returns:
+        - numpy.ndarray: The selected features array with shape (n_samples, k).
+        """
+        # Sequential forward feature selection
+        sfs = SequentialFeatureSelector(LinearDiscriminantAnalysis(), n_features_to_select=k, direction='forward').fit(self.data, self.labels)
+        # Return the selected features
+        return self.data.loc[:, sfs.get_support()].columns
+
+
 #%% 1- Pre Processing and EDA
 
 
@@ -721,21 +742,20 @@ data_analysis_instance.process_data()
 # Determine the range of values for each variable
 data_analysis_instance.determine_range()
 
-# Verify the presence of duplicated data and remove it
-data_analysis_instance.assess_quality()
+# Verify the presence of missing values, duplicated data and outliers and clean the data
+dataset_cleaned = data_analysis_instance.data_cleaning()
+
+# Save the cleaned dataset to a new csv file
+dataset_cleaned.to_csv('data/heart_2020_cleaned.csv', index=False)
 
 # Plots after the cleansing and processing
 data_analysis_instance.plots(['correlation'])
-
-# Cleaned CSV
-path_cleaned = 'data/heart_2020_cleaned.csv'
-dataset_cleaned = pd.read_csv(path_cleaned)
 
 # Initialize DimensionalityReduction object with the dataset
 dr = DimensionalityReduction(dataset_cleaned)
 
 # Compute and plot PCA projection
-dr.plot_projection(dr.compute_pca(), 'PCA Projection')
+# dr.plot_projection(dr.compute_pca(), 'PCA Projection')
 # Compute and plot LDA projection
 # dr.plot_projection(dr.compute_lda(), 'LDA Projection')
 # Compute and plot t-SNE projection
@@ -917,19 +937,22 @@ for i in range(len(With_HD)):
 
 #%% 3- Modeling
 
-# extractor = FeatureExtractor(path_cleaned)
+extractor = FeatureExtractor(dataset_cleaned)
 
 # Extract features
-# feature_df = extractor.extract_features()
+feature_df = extractor.extract_features()
 # Display the dataframe
-# print(feature_df)
+print(feature_df)
 # Plot the features per class
-# extractor.plot_all_features()
+extractor.plot_all_features()
 
-# feature_selector = FeatureSelector(feature_df)
+feature_data = feature_df.drop(columns=['HeartDisease'])
+feature_labels = feature_df['HeartDisease']
+
+feature_selector = FeatureSelector(feature_data, feature_labels)
 # Use the select_features_mrmr method
-# selected_features_mrmr = feature_selector.select_features_mrmr()
-# print("Selected features (mRMR):", selected_features_mrmr)
+selected_features_mrmr = feature_selector.select_features_mrmr()
+print("Selected features (mRMR):", selected_features_mrmr)
 # Use the select_features_sequential method
-# selected_features_seq = feature_selector.select_features_sequential()
-# print("Selected features (sequential):", selected_features_seq)
+selected_features_seq = feature_selector.select_features_sequential()
+print("Selected features (sequential):", selected_features_seq)
