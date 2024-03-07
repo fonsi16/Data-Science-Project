@@ -305,8 +305,8 @@ class DataVisualization:
         if 'barh' in plot_types:
             # Train a RandomForestClassifier model
             clf = RandomForestClassifier()
-            X = self.data_loader.data.drop(columns=['target'])  # Features
-            y = self.data_loader.data['target']  # Target variable
+            X = self.data_loader.data.drop(columns=[self.data_loader.data.target])  # Features
+            y = self.data_loader.data[self.data_loader.data.target]  # Target variable
             clf.fit(X, y)
 
             # Calculate permutation importance
@@ -701,7 +701,7 @@ data_loader = DataManipulator(path, 'HeartDisease')
 # Process all the data to numeric values and determine the range of values for each variable
 data_preprocessing = DataPreProcessing(data_loader)
 
-data_visualization = DataVisualization(data_preprocessing.data_loader)
+data_visualization = DataVisualization(data_loader)
 
 # Visualization of the outliers and all the histograms
 data_visualization.plot_all_features()
@@ -722,7 +722,7 @@ data_loader.data.to_csv('data/heart_2020_cleaned.csv', index=False)
 
 data_visualization_cleaned = DataVisualization(data_loader)
 data_visualization_cleaned.plots(['count'])
-data_visualization_cleaned.plots(['correlation', 'barh'])
+# data_visualization_cleaned.plots(['correlation', 'barh'])
 
 # Initialize DimensionalityReduction object with the dataset
 dr = DimensionalityReduction(data_loader)
