@@ -321,6 +321,7 @@ class DataVisualization:
             plt.title('Permutation Importance')
             plt.show()
 
+
 class DimensionalityReduction:
     def __init__(self, data_loader):
         """
@@ -384,7 +385,72 @@ class DimensionalityReduction:
 
 class HypothesisTester:
 
-    def unpaired_anova(self, *groups):
+    def __init__(self, data_loader):
+
+        self.data_loader = data_loader
+
+        # Column Data with Hearth Disease
+        self.BMI_with_HD = data_loader.data['BMI'][data_loader.data['HeartDisease'] == 1]
+        self.Smoke_with_HD = data_loader.data['Smoking'][data_loader.data['HeartDisease'] == 1]
+        self.Alcohol_with_HD = data_loader.data['AlcoholDrinking'][data_loader.data['HeartDisease'] == 1]
+        self.Stroke_with_HD = data_loader.data['Stroke'][data_loader.data['HeartDisease'] == 1]
+        self.PH_with_HD = data_loader.data['PhysicalHealth'][data_loader.data['HeartDisease'] == 1]
+        self.MH_with_HD = data_loader.data['MentalHealth'][data_loader.data['HeartDisease'] == 1]
+        self.DW_with_HD = data_loader.data['DiffWalking'][data_loader.data['HeartDisease'] == 1]
+        self.Sex_with_HD = data_loader.data['Sex'][data_loader.data['HeartDisease'] == 1]
+        self.AC_with_HD = data_loader.data['AgeCategory'][data_loader.data['HeartDisease'] == 1]
+        self.Diabetic_with_HD = data_loader.data['Diabetic'][data_loader.data['HeartDisease'] == 1]
+        self.PA_with_HD = data_loader.data['PhysicalActivity'][data_loader.data['HeartDisease'] == 1]
+        self.GH_with_HD = data_loader.data['GenHealth'][data_loader.data['HeartDisease'] == 1]
+        self.ST_with_HD = data_loader.data['SleepTime'][data_loader.data['HeartDisease'] == 1]
+        self.Asthma_with_HD = data_loader.data['Asthma'][data_loader.data['HeartDisease'] == 1]
+        self.KD_with_HD = data_loader.data['KidneyDisease'][data_loader.data['HeartDisease'] == 1]
+        self.SC_with_HD = data_loader.data['SkinCancer'][data_loader.data['HeartDisease'] == 1]
+
+        self.With_HD = [self.BMI_with_HD, self.Smoke_with_HD, self.Alcohol_with_HD, self.Stroke_with_HD,
+                        self.PH_with_HD, self.MH_with_HD, self.DW_with_HD,
+                        self.Sex_with_HD, self.AC_with_HD, self.Diabetic_with_HD, self.PA_with_HD, self.GH_with_HD,
+                        self.ST_with_HD, self.Asthma_with_HD, self.KD_with_HD, self.SC_with_HD]
+
+        # Column Data without Hearth Disease
+        self.BMI_without_HD = data_loader.data['BMI'][data_loader.data['HeartDisease'] == 0]
+        self.Smoke_without_HD = data_loader.data['Smoking'][data_loader.data['HeartDisease'] == 0]
+        self.Alcohol_without_HD = data_loader.data['AlcoholDrinking'][data_loader.data['HeartDisease'] == 0]
+        self.Stroke_without_HD = data_loader.data['Stroke'][data_loader.data['HeartDisease'] == 0]
+        self.PH_without_HD = data_loader.data['PhysicalHealth'][data_loader.data['HeartDisease'] == 0]
+        self.MH_without_HD = data_loader.data['MentalHealth'][data_loader.data['HeartDisease'] == 0]
+        self.DW_without_HD = data_loader.data['DiffWalking'][data_loader.data['HeartDisease'] == 0]
+        self.Sex_without_HD = data_loader.data['Sex'][data_loader.data['HeartDisease'] == 0]
+        self.AC_without_HD = data_loader.data['AgeCategory'][data_loader.data['HeartDisease'] == 0]
+        self.Diabetic_without_HD = data_loader.data['Diabetic'][data_loader.data['HeartDisease'] == 0]
+        self.PA_without_HD = data_loader.data['PhysicalActivity'][data_loader.data['HeartDisease'] == 0]
+        self.GH_without_HD = data_loader.data['GenHealth'][data_loader.data['HeartDisease'] == 0]
+        self.ST_without_HD = data_loader.data['SleepTime'][data_loader.data['HeartDisease'] == 0]
+        self.Asthma_without_HD = data_loader.data['Asthma'][data_loader.data['HeartDisease'] == 0]
+        self.KD_without_HD = data_loader.data['KidneyDisease'][data_loader.data['HeartDisease'] == 0]
+        self.SC_without_HD = data_loader.data['SkinCancer'][data_loader.data['HeartDisease'] == 0]
+
+        self.Without_HD = [self.BMI_without_HD, self.Smoke_without_HD, self.Alcohol_without_HD, self.Stroke_without_HD,
+                           self.PH_without_HD, self.MH_without_HD, self.DW_without_HD, self.Sex_without_HD,
+                           self.AC_without_HD, self.Diabetic_without_HD,self.PA_without_HD, self.GH_without_HD,
+                           self.ST_without_HD, self.Asthma_without_HD, self.KD_without_HD, self.SC_without_HD]
+
+        self.variable_names = ['BMI_with_HD', 'Smoke_with_HD', 'Alcohol_with_HD', 'Stroke_with_HD', 'PH_with_HD', 'MH_with_HD', 'DW_with_HD',
+                'Sex_with_HD', 'AC_with_HD', 'Diabetic_with_HD', 'PA_with_HD', 'GH_with_HD', 'ST_with_HD',
+                'Asthma_with_HD', 'KD_with_HD', 'SC_with_HD', 'BMI_without_HD', 'Smoke_without_HD', 'Alcohol_without_HD',
+                'Stroke_without_HD', 'PH_without_HD', 'MH_without_HD', 'DW_without_HD', 'Sex_without_HD', 'AC_without_HD',
+                'Diabetic_without_HD', 'PA_without_HD', 'GH_without_HD', 'ST_without_HD',
+                'Asthma_without_HD', 'KD_without_HD', 'SC_without_HD']
+        self.data_samples = (self.BMI_with_HD, self.Smoke_with_HD, self.Alcohol_with_HD,
+                        self.Stroke_with_HD, self.PH_with_HD, self.MH_with_HD, self.DW_with_HD, self.Sex_with_HD,
+                        self.AC_with_HD, self.Diabetic_with_HD, self.PA_with_HD, self.GH_with_HD, self.ST_with_HD,
+                        self.Asthma_with_HD, self.KD_with_HD, self.SC_with_HD, self.BMI_without_HD,
+                        self.Smoke_without_HD, self.Alcohol_without_HD,self.Stroke_without_HD,
+                        self.PH_without_HD, self.MH_without_HD, self.DW_without_HD, self.Sex_without_HD,
+                        self.AC_without_HD, self.Diabetic_without_HD, self.PA_without_HD, self.GH_without_HD,
+                        self.ST_without_HD, self.Asthma_without_HD, self.KD_without_HD, self.SC_without_HD)
+
+    def _unpaired_anova(self, *groups):
         """
         Perform unpaired ANOVA for more than two groups.
 
@@ -399,7 +465,7 @@ class HypothesisTester:
         f_statistic, p_value = f_oneway(*groups)
         return f_statistic, p_value
 
-    def wilcoxon_ranksum_test(self, group1, group2):
+    def _wilcoxon_ranksum_test(self, group1, group2):
         """
         Perform Wilcoxon rank-sum test (Mann-Whitney U test) for two independent samples.
 
@@ -415,7 +481,7 @@ class HypothesisTester:
 
         return statistic, p_value
 
-    def kruskal_wallis_test(self, *groups):
+    def _kruskal_wallis_test(self, *groups):
         """
         Perform Kruskal-Wallis H test for independent samples.
 
@@ -430,7 +496,41 @@ class HypothesisTester:
         statistic, p_value = kruskal(*groups)
         return statistic, p_value
 
-    def qq_plots(self, variable_names, *data_samples, distribution='norm'):
+    def perform_tests(self):
+
+        # Iterate over the indices of the arrays
+        for i in range(len(self.With_HD)):
+            # Perform ANOVA test
+            f_stat, p_val_anova = self._unpaired_anova(self.With_HD[i], self.Without_HD[i])
+
+            # Print the results
+            print(f"\nUnpaired ANOVA between the array of {self.With_HD[i].name} with HeartDisease and the array without : ")
+            print("F-statistic:", f_stat)
+            print("p-value:", p_val_anova)
+
+        # Iterate over the indices of the arrays
+        for i in range(len(self.With_HD)):
+            # Perform Wilcoxon rank-sum test
+            statistic, p_value = self._wilcoxon_ranksum_test(self.With_HD[i], self.Without_HD[i])
+
+            # Print the results
+            print(
+                f"\nWilcoxon rank-sum test between the array of {self.With_HD[i].name} with HeartDisease and the array without : ")
+            print("Test statistic:", statistic)
+            print("p-value:", p_value)
+
+        # Iterate over the indices of the arrays
+        for i in range(len(self.With_HD)):
+            # Perform Kruskal-Wallis test
+            statistic, p_value = self._kruskal_wallis_test(self.With_HD[i], self.Without_HD[i])
+
+            # Print the results
+            print(
+                f"\nKruskal-Wallis test between the array of {self.With_HD[i].name} with HeartDisease and the array without:")
+            print("Test statistic:", statistic)
+            print("p-value:", p_value)
+
+    def qq_plots(self, distribution='norm'):
         """
         Generate Q-Q plots for multiple data samples.
 
@@ -443,7 +543,7 @@ class HypothesisTester:
         Returns:
         - None (displays the Q-Q plots)
         """
-        num_samples = len(data_samples)
+        num_samples = len(self.data_samples)
         num_rows = (num_samples + 1) // 2  # Calculate the number of rows for subplots
         num_cols = 2 if num_samples > 1 else 1  # Ensure at least 1 column for subplots
 
@@ -452,18 +552,18 @@ class HypothesisTester:
         fig, axes = plt.subplots(num_rows, num_cols, figsize=(12, fig_height))
         axes = axes.flatten()  # Flatten axes if multiple subplots
 
-        for i, data in enumerate(data_samples):
+        for i, data in enumerate(self.data_samples):
             ax = axes[i]
             probplot(data, dist=distribution, plot=ax)
             ax.set_title(f'Q-Q Plot ({distribution})')
             ax.set_xlabel('Theoretical Quantiles')
-            ax.set_ylabel(variable_names[i])
+            ax.set_ylabel(self.variable_names[i])
 
         # Adjust layout and show plots
         plt.tight_layout()
         plt.show()
 
-    def test_normality(self, variable_names, *data_samples):
+    def test_normality(self):
         """
         Test the normality of multiple data samples using Shapiro-Wilk test.
 
@@ -480,7 +580,7 @@ class HypothesisTester:
         print('\nNormality Test:\n')
 
         results = {}
-        for name, data in zip(variable_names, data_samples):
+        for name, data in zip(self.variable_names, self.data_samples):
             results[name] = shapiro(data)
         for variable_name, shapiro_result in results.items():
             print(f'{variable_name}:')
@@ -559,7 +659,7 @@ data_loader.data.to_csv('data/heart_2020_cleaned.csv', index=False)
 
 data_visualization_cleaned = DataVisualization(data_loader)
 data_visualization_cleaned.plots(['count'])
-# data_visualization_cleaned.plots(['correlation', 'barh'])
+data_visualization_cleaned.plots(['correlation', 'barh'])
 
 # Initialize DimensionalityReduction object with the dataset
 dr = DimensionalityReduction(data_loader)
@@ -571,148 +671,15 @@ dr.plot_projection(dr.compute_umap(), 'UMAP Projection')
 
 #%% 2- Hypothesis Testing
 
-BMI = data_loader.data['BMI']
-Smoke = data_loader.data['Smoking']
-Alcohol = data_loader.data['AlcoholDrinking']
-Stroke = data_loader.data['Stroke']
-PH = data_loader.data['PhysicalHealth']
-MH = data_loader.data['MentalHealth']
-DW = data_loader.data['DiffWalking']
-Sex = data_loader.data['Sex']
-AC = data_loader.data['AgeCategory']
-Diabetic = data_loader.data['Diabetic']
-PA = data_loader.data['PhysicalActivity']
-GH = data_loader.data['GenHealth']
-ST = data_loader.data['SleepTime']
-Asthma = data_loader.data['Asthma']
-KD = data_loader.data['KidneyDisease']
-SC = data_loader.data['SkinCancer']
-
-# Column Data with Hearth Disease
-BMI_with_HD = data_loader.data['BMI'][data_loader.data['HeartDisease'] == 1]
-Smoke_with_HD = data_loader.data['Smoking'][data_loader.data['HeartDisease'] == 1]
-Alcohol_with_HD = data_loader.data['AlcoholDrinking'][data_loader.data['HeartDisease'] == 1]
-Stroke_with_HD = data_loader.data['Stroke'][data_loader.data['HeartDisease'] == 1]
-PH_with_HD = data_loader.data['PhysicalHealth'][data_loader.data['HeartDisease'] == 1]
-MH_with_HD = data_loader.data['MentalHealth'][data_loader.data['HeartDisease'] == 1]
-DW_with_HD = data_loader.data['DiffWalking'][data_loader.data['HeartDisease'] == 1]
-Sex_with_HD = data_loader.data['Sex'][data_loader.data['HeartDisease'] == 1]
-AC_with_HD = data_loader.data['AgeCategory'][data_loader.data['HeartDisease'] == 1]
-Diabetic_with_HD = data_loader.data['Diabetic'][data_loader.data['HeartDisease'] == 1]
-PA_with_HD = data_loader.data['PhysicalActivity'][data_loader.data['HeartDisease'] == 1]
-GH_with_HD = data_loader.data['GenHealth'][data_loader.data['HeartDisease'] == 1]
-ST_with_HD = data_loader.data['SleepTime'][data_loader.data['HeartDisease'] == 1]
-Asthma_with_HD = data_loader.data['Asthma'][data_loader.data['HeartDisease'] == 1]
-KD_with_HD = data_loader.data['KidneyDisease'][data_loader.data['HeartDisease'] == 1]
-SC_with_HD = data_loader.data['SkinCancer'][data_loader.data['HeartDisease'] == 1]
-
-With_HD = [BMI_with_HD, Smoke_with_HD, Alcohol_with_HD, Stroke_with_HD, PH_with_HD, MH_with_HD, DW_with_HD,
-           Sex_with_HD, AC_with_HD, Diabetic_with_HD, PA_with_HD, GH_with_HD, ST_with_HD,
-           Asthma_with_HD, KD_with_HD, SC_with_HD]
-
-# Column Data without Hearth Disease
-BMI_without_HD = data_loader.data['BMI'][data_loader.data['HeartDisease'] == 0]
-Smoke_without_HD = data_loader.data['Smoking'][data_loader.data['HeartDisease'] == 0]
-Alcohol_without_HD = data_loader.data['AlcoholDrinking'][data_loader.data['HeartDisease'] == 0]
-Stroke_without_HD = data_loader.data['Stroke'][data_loader.data['HeartDisease'] == 0]
-PH_without_HD = data_loader.data['PhysicalHealth'][data_loader.data['HeartDisease'] == 0]
-MH_without_HD = data_loader.data['MentalHealth'][data_loader.data['HeartDisease'] == 0]
-DW_without_HD = data_loader.data['DiffWalking'][data_loader.data['HeartDisease'] == 0]
-Sex_without_HD = data_loader.data['Sex'][data_loader.data['HeartDisease'] == 0]
-AC_without_HD = data_loader.data['AgeCategory'][data_loader.data['HeartDisease'] == 0]
-Diabetic_without_HD = data_loader.data['Diabetic'][data_loader.data['HeartDisease'] == 0]
-PA_without_HD = data_loader.data['PhysicalActivity'][data_loader.data['HeartDisease'] == 0]
-GH_without_HD = data_loader.data['GenHealth'][data_loader.data['HeartDisease'] == 0]
-ST_without_HD = data_loader.data['SleepTime'][data_loader.data['HeartDisease'] == 0]
-Asthma_without_HD = data_loader.data['Asthma'][data_loader.data['HeartDisease'] == 0]
-KD_without_HD = data_loader.data['KidneyDisease'][data_loader.data['HeartDisease'] == 0]
-SC_without_HD = data_loader.data['SkinCancer'][data_loader.data['HeartDisease'] == 0]
-
-Without_HD = [BMI_without_HD, Smoke_without_HD, Alcohol_without_HD, Stroke_without_HD, PH_without_HD,
-              MH_without_HD, DW_without_HD, Sex_without_HD, AC_without_HD, Diabetic_without_HD,
-              PA_without_HD, GH_without_HD, ST_without_HD, Asthma_without_HD, KD_without_HD, SC_without_HD]
-
 # Initialize the HypothesisTester class with the data
-tester = HypothesisTester()
+tester = HypothesisTester(data_loader)
 
 # Perform normality analysis, first by visual checking using a Q-Q plot and then by normality test
-tester.qq_plots(['BMI_with_HD', 'Smoke_with_HD', 'Alcohol_with_HD', 'Stroke_with_HD', 'PH_with_HD', 'MH_with_HD', 'DW_with_HD',
-                'Sex_with_HD', 'AC_with_HD', 'Diabetic_with_HD', 'PA_with_HD', 'GH_with_HD', 'ST_with_HD',
-                'Asthma_with_HD', 'KD_with_HD', 'SC_with_HD', 'BMI_without_HD', 'Smoke_without_HD', 'Alcohol_without_HD',
-                'Stroke_without_HD', 'PH_without_HD', 'MH_without_HD', 'DW_without_HD', 'Sex_without_HD', 'AC_without_HD',
-                'Diabetic_without_HD', 'PA_without_HD', 'GH_without_HD', 'ST_without_HD',
-                'Asthma_without_HD', 'KD_without_HD', 'SC_without_HD'], BMI_with_HD, Smoke_with_HD, Alcohol_with_HD,
-                Stroke_with_HD, PH_with_HD, MH_with_HD, DW_with_HD,
-                Sex_with_HD, AC_with_HD, Diabetic_with_HD, PA_with_HD, GH_with_HD, ST_with_HD,
-                Asthma_with_HD, KD_with_HD, SC_with_HD, BMI_without_HD, Smoke_without_HD, Alcohol_without_HD,
-                Stroke_without_HD, PH_without_HD, MH_without_HD, DW_without_HD, Sex_without_HD, AC_without_HD,
-                Diabetic_without_HD, PA_without_HD, GH_without_HD, ST_without_HD,
-                Asthma_without_HD, KD_without_HD, SC_without_HD)
+tester.qq_plots()
+tester.test_normality()
 
-tester.test_normality(['BMI_with_HD', 'Smoke_with_HD', 'Alcohol_with_HD', 'Stroke_with_HD', 'PH_with_HD', 'MH_with_HD', 'DW_with_HD',
-                'Sex_with_HD', 'AC_with_HD','Diabetic_with_HD', 'PA_with_HD', 'GH_with_HD', 'ST_with_HD',
-                'Asthma_with_HD', 'KD_with_HD', 'SC_with_HD', 'BMI_without_HD', 'Smoke_without_HD', 'Alcohol_without_HD',
-                'Stroke_without_HD', 'PH_without_HD', 'MH_without_HD', 'DW_without_HD', 'Sex_without_HD', 'AC_without_HD',
-                'Diabetic_without_HD', 'PA_without_HD', 'GH_without_HD', 'ST_without_HD',
-                'Asthma_without_HD', 'KD_without_HD', 'SC_without_HD'], BMI_with_HD, Smoke_with_HD, Alcohol_with_HD,
-                Stroke_with_HD, PH_with_HD, MH_with_HD, DW_with_HD,
-                Sex_with_HD, AC_with_HD, Diabetic_with_HD, PA_with_HD, GH_with_HD, ST_with_HD,
-                Asthma_with_HD, KD_with_HD, SC_with_HD, BMI_without_HD, Smoke_without_HD, Alcohol_without_HD,
-                Stroke_without_HD, PH_without_HD, MH_without_HD, DW_without_HD, Sex_without_HD, AC_without_HD,
-                Diabetic_without_HD, PA_without_HD, GH_without_HD, ST_without_HD,
-                Asthma_without_HD, KD_without_HD, SC_without_HD)
-
-#------------------------------TESTES DE ARRAYS DA MESMA FEATURE COM E SEM DOENÇA CARDIACA------------------------------
-
-# Iterate over the indices of the arrays
-for i in range(len(With_HD)):
-
-    # Perform ANOVA test
-    f_stat, p_val_anova = tester.unpaired_anova(With_HD[i], Without_HD[i])
-
-    # Print the results
-    print(f"\nUnpaired ANOVA between the array of {With_HD[i].name} with HeartDisease and the array without : ")
-    print("F-statistic:", f_stat)
-    print("p-value:", p_val_anova)
-
-# Iterate over the indices of the arrays
-for i in range(len(With_HD)):
-
-    # Perform Wilcoxon rank-sum test
-    statistic, p_value = tester.wilcoxon_ranksum_test(With_HD[i], Without_HD[i])
-
-    # Print the results
-    print(f"\nWilcoxon rank-sum test between the array of {With_HD[i].name} with HeartDisease and the array without : ")
-    print("Test statistic:", statistic)
-    print("p-value:", p_value)
-
-
-# Iterate over the indices of the arrays
-for i in range(len(With_HD)):
-
-    # Perform Kruskal-Wallis test
-    statistic, p_value = tester.kruskal_wallis_test(With_HD[i], Without_HD[i])
-
-    # Print the results
-    print(f"\nKruskal-Wallis test between the array of {With_HD[i].name} with HeartDisease and the array without:")
-    print("Test statistic:", statistic)
-    print("p-value:", p_value)
+tester.perform_tests()
 
 #%% 3- Modeling
 
-# extractor = FeatureExtractor(dataset_cleaned)
-#
-# # Extract features
-# feature_df = extractor.extract_features()
-# # Display the dataframe
-# print(feature_df)
-# # Plot the features per class
-# extractor.plot_all_features()
-#
-# feature_data = feature_df.drop(columns=['HeartDisease'])
-# feature_labels = feature_df['HeartDisease']
-#
-# feature_selector = FeatureSelector(feature_data, feature_labels)
-# # Use the select_features_mrmr method
-# selected_features_mrmr = feature_selector.select_features_mrmr()
-# print("Selected features (mRMR):", selected_features_mrmr)
+
