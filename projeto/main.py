@@ -193,6 +193,7 @@ class DataCleaning:
 
         if self.data_loader.data.duplicated().sum() > 0:
             self.data_loader.data = self.data_loader.data.drop_duplicates(keep='first')
+            self.data_loader.data.target = 'HeartDisease'
 
     def detect_and_remove_outliers(self):
 
@@ -738,12 +739,12 @@ data_visualization_cleaned.plots(['correlation', 'barh'])
 # Initialize DimensionalityReduction object with the dataset
 dr = DimensionalityReduction(data_loader)
 
-# # Compute and plot PCA projection
-# dr.plot_projection(dr.compute_pca(), 'PCA Projection')
-# # Compute and plot t-SNE projection
-# dr.plot_projection(dr.compute_tsne(), 't-SNE Projection')
-# # Compute and plot UMAP projection
-# dr.plot_projection(dr.compute_umap(), 'UMAP Projection')
+# Compute and plot PCA projection
+dr.plot_projection(dr.compute_pca(), 'PCA Projection')
+# Compute and plot t-SNE projection
+dr.plot_projection(dr.compute_tsne(), 't-SNE Projection')
+# Compute and plot UMAP projection
+dr.plot_projection(dr.compute_umap(), 'UMAP Projection')
 
 #%% 2- Hypothesis Testing
 
