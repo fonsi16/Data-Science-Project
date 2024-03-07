@@ -55,13 +55,6 @@ class DataLoader:
 
             self.labels = self.data[target]
 
-            # Iterate over columns and categorize them
-            for column in self.data.columns:
-                if len(self.data[column].unique()) > 2:
-                    self.numerical_features.append(column)
-                else:
-                    self.categorical_features.append(column)
-
             print("Data loaded successfully.")
 
         except FileNotFoundError:
@@ -158,6 +151,13 @@ class DataPreProcessing:
         self._age_encode()
         self._race_encode()
         self._gen_health_encode()
+
+        # Fill the numerical and the categorical features arrays
+        for column in self.data_loader.data.columns:
+            if len(self.data_loader.data[column].unique()) > 2:
+                self.data_loader.numerical_features.append(column)
+            else:
+                self.data_loader.categorical_features.append(column)
 
         print("\nProcessed Dataset:")
         print(self.data_loader.data.info())
@@ -364,19 +364,6 @@ class DimensionalityReduction:
         - pca_projection: The projected data using PCA.
         """
         return PCA(n_components=n_components).fit_transform(self.data)
-
-    def compute_tsne(self, n_components=2, perplexity=3):
-        """
-        Compute t-Distributed Stochastic Neighbor Embedding (t-SNE) on the dataset.
-
-        Parameters:
-        - n_components: The number of components to embed the data into.
-        - perplexity: The perplexity parameter for t-SNE.
-
-        Returns:
-        - tsne_projection: The projected data using t-SNE.
-        """
-        return TSNE(n_components=n_components, perplexity=perplexity).fit_transform(self.data)
 
     def compute_umap(self, n_components=2, n_neighbors=8, min_dist=0.5, metric='euclidean'):
         """
@@ -741,8 +728,6 @@ dr = DimensionalityReduction(data_loader)
 
 # Compute and plot PCA projection
 dr.plot_projection(dr.compute_pca(), 'PCA Projection')
-# Compute and plot t-SNE projection
-dr.plot_projection(dr.compute_tsne(), 't-SNE Projection')
 # Compute and plot UMAP projection
 dr.plot_projection(dr.compute_umap(), 'UMAP Projection')
 
