@@ -55,13 +55,6 @@ class DataLoader:
 
             self.labels = self.data[target]
 
-            # Iterate over columns and categorize them
-            for column in self.data.columns:
-                if len(self.data[column].unique()) > 2:
-                    self.numerical_features.append(column)
-                else:
-                    self.categorical_features.append(column)
-
             print("Data loaded successfully.")
 
         except FileNotFoundError:
@@ -162,6 +155,13 @@ class DataPreProcessing:
         print("\nProcessed Dataset:")
         print(self.data_loader.data.info())
 
+        # Iterate over columns and categorize them
+        for column in self.data_loader.data.columns:
+            if len(self.data_loader.data[column].unique()) > 2:
+                self.data_loader.numerical_features.append(column)
+            else:
+                self.data_loader.categorical_features.append(column)
+
 
 class DataCleaning:
     """
@@ -243,11 +243,10 @@ class DataVisualization:
     def plot_all_features(self):
 
         num_features = len(self.feature_names)
-        num_cols = 4  # Adjust the number of columns to control subplot arrangement
+        num_cols = 3  # Adjust the number of columns to control subplot arrangement
         num_rows = int(np.ceil(num_features / num_cols))
 
         fig, axes = plt.subplots(num_rows, num_cols, figsize=(15, 3 * num_rows))
-        fig.suptitle('All Features', fontsize=20)
 
         for idx, ax in enumerate(axes.flat):
             if idx < num_features:
@@ -319,7 +318,6 @@ class DataVisualization:
             plt.ylabel('Features')
             plt.title('Permutation Importance')
             plt.show()
-
 
 class DimensionalityReduction:
     def __init__(self, data_loader):
@@ -714,7 +712,7 @@ data_loader = DataManipulator(path, 'HeartDisease')
 # Process all the data to numeric values and determine the range of values for each variable
 data_preprocessing = DataPreProcessing(data_loader)
 
-data_visualization = DataVisualization(data_loader)
+data_visualization = DataVisualization(data_preprocessing.data_loader)
 
 # Visualization of the outliers and all the histograms
 data_visualization.plot_all_features()
