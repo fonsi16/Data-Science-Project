@@ -382,48 +382,6 @@ class DimensionalityReduction:
                          metric=metric).fit_transform(self.data)
 
 
-class DataAnalysis:
-    def __init__(self, data_loader):
-        """
-        Initialize the DataAnalysis class.
-
-        Parameters:
-        - dataset (array-like): The dataset to be analyzed.
-        - labels (array-like): The labels corresponding to each of the dataset samples.
-        - columns_names (list): List of column (features) names for the dataset.
-
-        This method initializes the DataAnalysis class by setting up the attributes
-        for the dataset, labels, and column names.
-        """
-        self.data_loader = data_loader
-
-        self.valid_plot_types = ['count', 'hist', 'kde', 'correlation', 'box', 'split_violin', 'barh']
-
-    def bmi_class(self):
-        bmi = self.df["BMI"]
-        condition = [bmi < 16, bmi < 17, bmi < 18.5, bmi < 25, bmi < 30, bmi < 35, bmi < 40, bmi >= 40]
-        choice = [1, 2, 3, 4, 5, 6, 7, 8]
-        self.df["BMIClass"] = np.select(condition, choice)
-
-    def sleep_class(self):
-        sleep = self.df["SleepTime"]
-        condition = [sleep < 6, sleep < 9, sleep >= 9]
-        choice = [1, 2, 3]
-        self.df["SleepClass"] = np.select(condition, choice)
-
-    def badHealth_feature(self):
-        smoker = self.df["Smoking"]
-        alcohol = self.df["AlcoholDrinking"]
-        stroke = self.df["Stroke"]
-        diffWalk = self.df["DiffWalking"]
-        diabetic = self.df["Diabetic"]
-        asthma = self.df["Asthma"]
-
-        condition = (smoker + alcohol + stroke + diffWalk + diabetic + asthma)
-
-        self.df["BadHealthScore"] = condition
-
-
 class HypothesisTester:
 
     def unpaired_anova(self, *groups):
@@ -530,167 +488,46 @@ class HypothesisTester:
         return results
 
 
-class FeatureExtractor:
-    """
-    A class to extract various types of features from a dataset.
-    """
-
-    def __init__(self, dataset):
+class DataAnalysis:
+    def __init__(self, data_loader):
         """
-        Initializes the FeatureExtractor object.
+        Initialize the DataAnalysis class.
 
         Parameters:
-        - data (numpy.ndarray): The input dataset.
+        - dataset (array-like): The dataset to be analyzed.
+        - labels (array-like): The labels corresponding to each of the dataset samples.
+        - columns_names (list): List of column (features) names for the dataset.
+
+        This method initializes the DataAnalysis class by setting up the attributes
+        for the dataset, labels, and column names.
         """
-        self.data = dataset
+        self.data_loader = data_loader
 
-        self.feature_names = self.data.columns.tolist()
-        self.labels = self.data['HeartDisease'].unique().tolist()
+        self.valid_plot_types = ['count', 'hist', 'kde', 'correlation', 'box', 'split_violin', 'barh']
 
-        self.all_features = []
+    def bmi_class(self):
+        bmi = self.df["BMI"]
+        condition = [bmi < 16, bmi < 17, bmi < 18.5, bmi < 25, bmi < 30, bmi < 35, bmi < 40, bmi >= 40]
+        choice = [1, 2, 3, 4, 5, 6, 7, 8]
+        self.df["BMIClass"] = np.select(condition, choice)
 
-    def _statistical_features(self):
-        """
-        Computes statistical features per sample (row) of the dataset.
+    def sleep_class(self):
+        sleep = self.df["SleepTime"]
+        condition = [sleep < 6, sleep < 9, sleep >= 9]
+        choice = [1, 2, 3]
+        self.df["SleepClass"] = np.select(condition, choice)
 
-        Returns:
-        - numpy.ndarray: An array containing statistical features per sample.
-        """
-        # Compute statistical features
-        mean = np.mean(self.data, axis=1)
-        std_dev = np.std(self.data, axis=1)
-        median = np.median(self.data, axis=1)
-        min_val = np.min(self.data, axis=1)
-        max_val = np.max(self.data, axis=1)
-        # Append feature names
-        self.feature_names.extend(['Mean'])
-        self.feature_names.extend(['Std_Dev'])
-        self.feature_names.extend(['Median'])
-        self.feature_names.extend(['Min'])
-        self.feature_names.extend(['Max'])
-        return np.column_stack((mean, std_dev, median, min_val, max_val))
+    def badHealth_feature(self):
+        smoker = self.df["Smoking"]
+        alcohol = self.df["AlcoholDrinking"]
+        stroke = self.df["Stroke"]
+        diffWalk = self.df["DiffWalking"]
+        diabetic = self.df["Diabetic"]
+        asthma = self.df["Asthma"]
 
-    def _pairwise_differences(self):
-        num_features = self.data.shape[1]
-        pairwise_diff_df = pd.DataFrame()
+        condition = (smoker + alcohol + stroke + diffWalk + diabetic + asthma)
 
-        for i in range(num_features - 1):
-            for j in range(i + 1, num_features):
-                feature_name = f'pairwise_diff_{i + 1}_vs_{j + 1}'
-                pairwise_diff_df[feature_name] = np.abs(self.data.iloc[:, i] - self.data.iloc[:, j])
-                self.feature_names.append(feature_name)
-
-        return pairwise_diff_df
-
-    def _frequency_domain_features(self):
-        """
-        Computes frequency domain features per sample (row) of the dataset using FFT.
-
-        Returns:
-        - numpy.ndarray: An array containing frequency domain features per sample.
-        """
-        # Compute frequency domain features using FFT
-        fft_result = fft(self.data)
-        # Append feature names
-        self.feature_names.extend(['FFT'])
-        return np.abs(fft_result).mean(axis=1).reshape(-1, 1)
-
-    def _entropy_features(self):
-
-        # Compute entropy-based features for each row
-        entropy_vals = np.array([entropy(row) for idx, row in self.data.iterrows()])
-
-        # Append feature names
-        self.feature_names.append('Entropy')
-
-        return entropy_vals.reshape(-1, 1)
-
-    def extract_features(self):
-        """
-        Extracts various types of features from the dataset.
-
-        Returns:
-        - pandas.DataFrame: A dataframe containing all extracted features.
-        """
-        # Extract and combine all features with the original features passed in data
-        self.all_features = np.hstack((self.data, self._statistical_features(), self._pairwise_differences(),
-                                  self._frequency_domain_features(), self._entropy_features()))
-        # Create pandas dataframe
-        return pd.DataFrame(data=self.all_features, columns=self.feature_names)
-
-    def plot_all_features(self):
-        """
-        Plot histograms for all extracted features.
-        Each histogram is plotted separately for each feature, with optional coloring based on provided labels.
-        """
-        num_features = self.all_features.shape[1]
-        num_cols = 4  # Adjust the number of columns to control subplot arrangement
-        num_rows = int(np.ceil(num_features / num_cols))
-
-        fig, axes = plt.subplots(num_rows, num_cols, figsize=(15, 3 * num_rows))
-        fig.suptitle('All Features', fontsize=20)
-
-        for idx, ax in enumerate(axes.flat):
-            if idx < num_features:
-                ax.set_title(f'Feature {self.feature_names[idx]}', fontsize=12)
-                ax.set_xlabel('Value', fontsize=10)
-                ax.set_ylabel('Frequency', fontsize=10)
-                ax.grid(True)
-
-                if self.labels is not None:
-                    # Add a plot per feature and label
-                    for label in self.labels:
-                        mask = np.array(self.data['HeartDisease'] == label)
-                        ax.hist(self.all_features[mask, idx], bins=20, alpha=0.7, label=label)
-                    ax.legend()
-
-        plt.tight_layout()
-        plt.show()
-
-
-class FeatureSelector:
-    def __init__(self, data, labels):
-        """
-        Initialize the FeatureSelector instance.
-
-        Parameters:
-        - data (numpy.ndarray): The input data array with shape (n_samples, n_features).
-        - labels (numpy.ndarray): The labels array with shape (n_samples,).
-        """
-        self.data = data
-        self.labels = labels
-
-        self._sanity_check()
-
-    def _sanity_check(self):
-        # Perform basic sanity checks
-        print("Dataset Shape:", self.data.shape)
-
-        # Check for missing values
-        print("\nMissing Values:")
-        print(self.data.isnull().sum())
-
-        # Check data types
-        print("\nData Types:")
-        print(self.data.dtypes)
-
-        # Check for zero variance features
-        zero_variance_features = self.data.columns[self.data.var() == 0]
-        print("\nZero Variance Features:", zero_variance_features)
-
-    def select_features_mrmr(self, k=5):
-        """
-        Select features using mRMR (minimum Redundancy Maximum Relevance).
-
-        Parameters:
-        - k (int): The number of features to select. Default is 5.
-
-        Returns:
-        - List: The selected features as a list.
-        """
-        # Return the selected features
-        return mrmr_classif(X=self.data, y=self.labels, K=k)
-
+        self.df["BadHealthScore"] = condition
 
 #%% 1- Pre Processing and EDA
 
