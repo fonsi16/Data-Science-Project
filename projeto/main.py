@@ -7,16 +7,11 @@ from sklearn.ensemble import RandomForestClassifier
 from sklearn.inspection import permutation_importance
 from sklearn.preprocessing import StandardScaler
 from sklearn.decomposition import PCA
-from sklearn.manifold import TSNE
-from sklearn.manifold import LocallyLinearEmbedding
-from sklearn.discriminant_analysis import LinearDiscriminantAnalysis
 import umap
-from scipy.stats import entropy, ttest_ind, f_oneway, ttest_rel, wilcoxon, kruskal, friedmanchisquare, probplot, shapiro
+from scipy.stats import entropy, f_oneway, kruskal, probplot, shapiro
 from scipy.fftpack import fft
 from mrmr import mrmr_classif
-import statsmodels.api as sm
 import statsmodels.stats.api as sms
-from statsmodels.formula.api import ols
 
 
 class DataLoader:
@@ -151,6 +146,13 @@ class DataPreProcessing:
         self._age_encode()
         self._race_encode()
         self._gen_health_encode()
+
+        # Fill the numerical and the categorical features arrays
+        for column in self.data_loader.data.columns:
+            if len(self.data_loader.data[column].unique()) > 2:
+                self.data_loader.numerical_features.append(column)
+            else:
+                self.data_loader.categorical_features.append(column)
 
         print("\nProcessed Dataset:")
         print(self.data_loader.data.info())
@@ -303,8 +305,8 @@ class DataVisualization:
         if 'barh' in plot_types:
             # Train a RandomForestClassifier model
             clf = RandomForestClassifier()
-            X = self.data_loader.data.drop(columns=[self.data_loader.data.target])  # Features
-            y = self.data_loader.data[self.data_loader.data.target]  # Target variable
+            X = self.data_loader.data.drop(columns=['target'])  # Features
+            y = self.data_loader.data['target']  # Target variable
             clf.fit(X, y)
 
             # Calculate permutation importance
@@ -313,7 +315,7 @@ class DataVisualization:
 
             # Visualize feature importance
             plt.figure(figsize=(10, 8))
-            sns.barplot(x=result.importances_mean[perm_sorted_idx], y=X.columns[perm_sorted_idx])
+            sns.barplot(x=result.importances_mean[perm_sorted_idx], y=X.columns[perm_sorted_idx], color='blue')
             plt.xlabel('Permutation Importance')
             plt.ylabel('Features')
             plt.title('Permutation Importance')
@@ -362,19 +364,6 @@ class DimensionalityReduction:
         - pca_projection: The projected data using PCA.
         """
         return PCA(n_components=n_components).fit_transform(self.data)
-
-    def compute_tsne(self, n_components=2, perplexity=3):
-        """
-        Compute t-Distributed Stochastic Neighbor Embedding (t-SNE) on the dataset.
-
-        Parameters:
-        - n_components: The number of components to embed the data into.
-        - perplexity: The perplexity parameter for t-SNE.
-
-        Returns:
-        - tsne_projection: The projected data using t-SNE.
-        """
-        return TSNE(n_components=n_components, perplexity=perplexity).fit_transform(self.data)
 
     def compute_umap(self, n_components=2, n_neighbors=8, min_dist=0.5, metric='euclidean'):
         """
@@ -732,6 +721,7 @@ print(data_loader.data.info)
 data_loader.data.to_csv('data/heart_2020_cleaned.csv', index=False)
 
 data_visualization_cleaned = DataVisualization(data_loader)
+data_visualization_cleaned.plots(['count'])
 data_visualization_cleaned.plots(['correlation', 'barh'])
 
 # Initialize DimensionalityReduction object with the dataset
@@ -739,8 +729,6 @@ dr = DimensionalityReduction(data_loader)
 
 # Compute and plot PCA projection
 dr.plot_projection(dr.compute_pca(), 'PCA Projection')
-# Compute and plot t-SNE projection
-dr.plot_projection(dr.compute_tsne(), 't-SNE Projection')
 # Compute and plot UMAP projection
 dr.plot_projection(dr.compute_umap(), 'UMAP Projection')
 
