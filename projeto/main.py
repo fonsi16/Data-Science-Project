@@ -8,9 +8,7 @@ from sklearn.inspection import permutation_importance
 from sklearn.preprocessing import StandardScaler
 from sklearn.decomposition import PCA
 import umap
-from scipy.stats import entropy, f_oneway, kruskal, probplot, shapiro
-from scipy.fftpack import fft
-from mrmr import mrmr_classif
+from scipy.stats import ttest_ind, ttest_rel, probplot, shapiro
 import statsmodels.stats.api as sms
 
 
@@ -450,21 +448,6 @@ class HypothesisTester:
                         self.AC_without_HD, self.Diabetic_without_HD, self.PA_without_HD, self.GH_without_HD,
                         self.ST_without_HD, self.Asthma_without_HD, self.KD_without_HD, self.SC_without_HD)
 
-    def _unpaired_anova(self, *groups):
-        """
-        Perform unpaired ANOVA for more than two groups.
-
-        Parameters:
-        - *groups: Variable length argument containing data for each group. Each argument should be a list or array-like
-        object.
-
-        Returns:
-        - f_statistic: The calculated F-statistic.
-        - p_value: The p-value associated with the F-statistic.
-        """
-        f_statistic, p_value = f_oneway(*groups)
-        return f_statistic, p_value
-
     def _wilcoxon_ranksum_test(self, group1, group2):
         """
         Perform Wilcoxon rank-sum test (Mann-Whitney U test) for two independent samples.
@@ -481,32 +464,48 @@ class HypothesisTester:
 
         return statistic, p_value
 
-    def _kruskal_wallis_test(self, *groups):
+    def unpaired_t_test(self, group1, group2):
         """
-        Perform Kruskal-Wallis H test for independent samples.
+        Perform unpaired t-test for two groups.
 
         Parameters:
-        - *groups: Variable length argument containing data for each group. Each argument should be a list or array-like
-        object.
+        - group1: List or array-like object containing data for group 1.
+        - group2: List or array-like object containing data for group 2.
 
         Returns:
-        - statistic: The calculated test statistic.
-        - p_value: The p-value associated with the test statistic.
+        - t_statistic: The calculated t-statistic.
+        - p_value: The p-value associated with the t-statistic.
         """
-        statistic, p_value = kruskal(*groups)
-        return statistic, p_value
+        t_statistic, p_value = ttest_ind(group1, group2)
+        return t_statistic, p_value
+
+    def paired_t_test(self, group1, group2):
+        """
+        Perform paired t-test for two groups.
+
+        Parameters:
+        - group1: List or array-like object containing data for group 1.
+        - group2: List or array-like object containing data for group 2.
+                  Should have the same length as group1.
+
+        Returns:
+        - t_statistic: The calculated t-statistic.
+        - p_value: The p-value associated with the t-statistic.
+        """
+        t_statistic, p_value = ttest_rel(group1, group2)
+        return t_statistic, p_value
 
     def perform_tests(self):
 
         # Iterate over the indices of the arrays
         for i in range(len(self.With_HD)):
-            # Perform ANOVA test
-            f_stat, p_val_anova = self._unpaired_anova(self.With_HD[i], self.Without_HD[i])
+            # Perform Unpaired T-Test
+            t_stat, p_val = tester.unpaired_t_test(self.With_HD[i], self.Without_HD[i])
 
             # Print the results
-            print(f"\nUnpaired ANOVA between the array of {self.With_HD[i].name} with HeartDisease and the array without : ")
-            print("F-statistic:", f_stat)
-            print("p-value:", p_val_anova)
+            print(f"\nUnpaired T-test test between the array of {self.With_HD[i].name} with HeartDisease and the array without : ")
+            print("t-statistic:", t_stat)
+            print("p-value:", p_val)
 
         # Iterate over the indices of the arrays
         for i in range(len(self.With_HD)):
@@ -514,19 +513,7 @@ class HypothesisTester:
             statistic, p_value = self._wilcoxon_ranksum_test(self.With_HD[i], self.Without_HD[i])
 
             # Print the results
-            print(
-                f"\nWilcoxon rank-sum test between the array of {self.With_HD[i].name} with HeartDisease and the array without : ")
-            print("Test statistic:", statistic)
-            print("p-value:", p_value)
-
-        # Iterate over the indices of the arrays
-        for i in range(len(self.With_HD)):
-            # Perform Kruskal-Wallis test
-            statistic, p_value = self._kruskal_wallis_test(self.With_HD[i], self.Without_HD[i])
-
-            # Print the results
-            print(
-                f"\nKruskal-Wallis test between the array of {self.With_HD[i].name} with HeartDisease and the array without:")
+            print(f"\nWilcoxon rank-sum test between the array of {self.With_HD[i].name} with HeartDisease and the array without : ")
             print("Test statistic:", statistic)
             print("p-value:", p_value)
 
@@ -588,46 +575,34 @@ class HypothesisTester:
         return results
 
 
-class DataAnalysis:
+class FeatureCreation:
     def __init__(self, data_loader):
-        """
-        Initialize the DataAnalysis class.
 
-        Parameters:
-        - dataset (array-like): The dataset to be analyzed.
-        - labels (array-like): The labels corresponding to each of the dataset samples.
-        - columns_names (list): List of column (features) names for the dataset.
-
-        This method initializes the DataAnalysis class by setting up the attributes
-        for the dataset, labels, and column names.
-        """
         self.data_loader = data_loader
 
-        self.valid_plot_types = ['count', 'hist', 'kde', 'correlation', 'box', 'split_violin', 'barh']
-
     def bmi_class(self):
-        bmi = self.df["BMI"]
+        bmi = self.data_loader.data["BMI"]
         condition = [bmi < 16, bmi < 17, bmi < 18.5, bmi < 25, bmi < 30, bmi < 35, bmi < 40, bmi >= 40]
         choice = [1, 2, 3, 4, 5, 6, 7, 8]
-        self.df["BMIClass"] = np.select(condition, choice)
+        self.data_loader.data["BMIClass"] = np.select(condition, choice)
 
     def sleep_class(self):
-        sleep = self.df["SleepTime"]
+        sleep = self.data_loader.data["SleepTime"]
         condition = [sleep < 6, sleep < 9, sleep >= 9]
         choice = [1, 2, 3]
-        self.df["SleepClass"] = np.select(condition, choice)
+        self.data_loader.data["SleepClass"] = np.select(condition, choice)
 
     def badHealth_feature(self):
-        smoker = self.df["Smoking"]
-        alcohol = self.df["AlcoholDrinking"]
-        stroke = self.df["Stroke"]
-        diffWalk = self.df["DiffWalking"]
-        diabetic = self.df["Diabetic"]
-        asthma = self.df["Asthma"]
+        smoker = self.data_loader.data["Smoking"]
+        alcohol = self.data_loader.data["AlcoholDrinking"]
+        stroke = self.data_loader.data["Stroke"]
+        diffWalk = self.data_loader.data["DiffWalking"]
+        diabetic = self.data_loader.data["Diabetic"]
+        asthma = self.data_loader.data["Asthma"]
 
         condition = (smoker + alcohol + stroke + diffWalk + diabetic + asthma)
 
-        self.df["BadHealthScore"] = condition
+        self.data_loader.data["BadHealthScore"] = condition
 
 #%% 1- Pre Processing and EDA
 
@@ -659,7 +634,7 @@ data_loader.data.to_csv('data/heart_2020_cleaned.csv', index=False)
 
 data_visualization_cleaned = DataVisualization(data_loader)
 data_visualization_cleaned.plots(['count'])
-data_visualization_cleaned.plots(['correlation', 'barh'])
+# data_visualization_cleaned.plots(['correlation', 'barh'])
 
 # Initialize DimensionalityReduction object with the dataset
 dr = DimensionalityReduction(data_loader)
@@ -667,7 +642,7 @@ dr = DimensionalityReduction(data_loader)
 # Compute and plot PCA projection
 dr.plot_projection(dr.compute_pca(), 'PCA Projection')
 # Compute and plot UMAP projection
-dr.plot_projection(dr.compute_umap(), 'UMAP Projection')
+# dr.plot_projection(dr.compute_umap(), 'UMAP Projection')
 
 #%% 2- Hypothesis Testing
 
