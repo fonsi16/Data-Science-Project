@@ -634,7 +634,7 @@ data_loader.data.to_csv('data/heart_2020_cleaned.csv', index=False)
 
 data_visualization_cleaned = DataVisualization(data_loader)
 data_visualization_cleaned.plots(['count'])
-# data_visualization_cleaned.plots(['correlation', 'barh'])
+data_visualization_cleaned.plots(['correlation', 'barh'])
 
 # Initialize DimensionalityReduction object with the dataset
 dr = DimensionalityReduction(data_loader)
@@ -642,7 +642,7 @@ dr = DimensionalityReduction(data_loader)
 # Compute and plot PCA projection
 dr.plot_projection(dr.compute_pca(), 'PCA Projection')
 # Compute and plot UMAP projection
-# dr.plot_projection(dr.compute_umap(), 'UMAP Projection')
+dr.plot_projection(dr.compute_umap(), 'UMAP Projection')
 
 #%% 2- Hypothesis Testing
 
