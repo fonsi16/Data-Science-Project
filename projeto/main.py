@@ -8,7 +8,7 @@ from sklearn.inspection import permutation_importance
 from sklearn.preprocessing import StandardScaler
 from sklearn.decomposition import PCA
 import umap
-from scipy.stats import ttest_ind, ttest_rel, probplot, shapiro
+from scipy.stats import ttest_ind, probplot, shapiro
 import statsmodels.stats.api as sms
 
 
@@ -121,7 +121,7 @@ class DataPreProcessing:
             gen_health == "Excellent", gen_health == "Very good",
             gen_health == "Good", gen_health == "Fair",
             gen_health == "Poor"]
-        choice = [1, 2, 3, 4, 5]
+        choice = [5, 4, 3, 2, 1]
         self.data_loader.data["GenHealth"] = np.select(condition, choice)
 
     def encode_data(self):
@@ -593,29 +593,138 @@ class FeatureCreation:
 
         self.data_loader = data_loader
 
-    def bmi_class(self):
+    def _bmi_class_feature(self):
         bmi = self.data_loader.data["BMI"]
         condition = [bmi < 16, bmi < 17, bmi < 18.5, bmi < 25, bmi < 30, bmi < 35, bmi < 40, bmi >= 40]
+
         choice = [1, 2, 3, 4, 5, 6, 7, 8]
+
         self.data_loader.data["BMIClass"] = np.select(condition, choice)
 
-    def sleep_class(self):
+        print("Created BMIClass feature\n")
+
+    def _sleep_class_feature(self):
         sleep = self.data_loader.data["SleepTime"]
         condition = [sleep < 6, sleep < 9, sleep >= 9]
+
         choice = [1, 2, 3]
+
         self.data_loader.data["SleepClass"] = np.select(condition, choice)
 
-    def badHealth_feature(self):
+        print("Created SleepClass feature\n")
+
+    def _bad_habits_score_feature(self):
         smoker = self.data_loader.data["Smoking"]
         alcohol = self.data_loader.data["AlcoholDrinking"]
-        stroke = self.data_loader.data["Stroke"]
-        diffWalk = self.data_loader.data["DiffWalking"]
-        diabetic = self.data_loader.data["Diabetic"]
+
+        condition = (smoker + alcohol)
+
+        self.data_loader.data["BadHabitsScore"] = condition
+
+        print("Created BadHabitsScore feature\n")
+
+    def _diseases_feature(self):
+        kidney_disease = self.data_loader.data["KidneyDisease"]
         asthma = self.data_loader.data["Asthma"]
+        skin_cancer = self.data_loader.data["SkinCancer"]
+        diabetic = self.data_loader.data["Diabetic"]
 
-        condition = (smoker + alcohol + stroke + diffWalk + diabetic + asthma)
+        condition = (kidney_disease + asthma + skin_cancer + diabetic)
 
-        self.data_loader.data["BadHealthScore"] = condition
+        self.data_loader.data["Diseases"] = condition
+
+        print("Created Diseases feature\n")
+
+    def _poor_health_days_month(self):
+        mental_health = self.data_loader.data["MentalHealth"]
+        physical_health = self.data_loader.data["PhysicalHealth"]
+
+        condition = (mental_health + physical_health) / 30
+
+        self.data_loader.data["PoorHealthDaysMonth"] = condition
+
+        print("Created PoorHealthDaysMonth feature\n")
+
+    def _dangerous_age_stroke(self):
+        strokes = self.data_loader.data["Stroke"]
+        ages = self.data_loader.data["AgeCategory"]
+
+        # Creating an empty list to store the conditions
+        conditions = []
+
+        # Looping through each data point
+        for stroke, age in zip(strokes, ages):
+            # Checking if the age is 10 or above and stroke is 1
+            if age >= 10 and stroke == 1:
+                condition = 1
+            else:
+                condition = 0
+            conditions.append(condition)
+
+        # Adding the conditions as a new column in the DataFrame
+        self.data_loader.data["DangerousStroke"] = conditions
+
+        print("Created DangerousStroke feature\n")
+
+    def _age_bmi_interaction_feature(self):
+        age = self.data_loader.data["AgeCategory"]
+        bmi = self.data_loader.data["BMI"]
+
+        condition = (age * bmi)
+
+        self.data_loader.data["AgeBMI_Interaction"] = condition
+
+        print("Created AgeBMI_Interaction feature\n")
+
+    def _bmi_sleep_interaction_feature(self):
+        sleep = self.data_loader.data["SleepTime"]
+        bmi = self.data_loader.data["BMI"]
+
+        condition = (sleep * bmi)
+
+        self.data_loader.data["BMISleep_Interaction"] = condition
+
+        print("Created BMISleep_Interaction feature\n")
+
+    def _age_gh_interaction_feature(self):
+        age = self.data_loader.data["AgeCategory"]
+        general_health = self.data_loader.data["GenHealth"]
+
+        condition = (age * general_health)
+
+        self.data_loader.data["AgeHealth_Interaction"] = condition
+
+        print("Created AgeHealth_Interaction feature\n")
+
+    def _age_sleep_interaction_feature(self):
+        age = self.data_loader.data["AgeCategory"]
+        sleep = self.data_loader.data["SleepTime"]
+
+        condition = (age * sleep)
+
+        self.data_loader.data["AgeSleep_Interaction"] = condition
+
+        print("Created AgeSleep_Interaction feature\n")
+
+    def create_modified_features(self):
+
+        self._bmi_class_feature()
+        self._sleep_class_feature()
+
+    def create_joined_features(self):
+
+        self._bad_habits_score_feature()
+        self._diseases_feature()
+        self._poor_health_days_month()
+        self._dangerous_age_stroke()
+
+    def create_interaction_features(self):
+
+        self._age_bmi_interaction_feature()
+        self._bmi_sleep_interaction_feature()
+        self._age_gh_interaction_feature()
+        self._age_sleep_interaction_feature()
+
 
 #%% 1- Pre Processing and EDA
 
@@ -645,9 +754,8 @@ print(data_loader.data.info)
 # Save the cleaned dataset to a new csv file
 data_loader.data.to_csv('data/heart_2020_cleaned.csv', index=False)
 
-data_visualization_cleaned = DataVisualization(data_loader)
-data_visualization_cleaned.plots(['count'])
-# data_visualization_cleaned.plots(['correlation', 'barh'])
+data_visualization.plots(['count'])
+data_visualization.plots(['correlation', 'barh'])
 
 # Initialize DimensionalityReduction object with the dataset
 dr = DimensionalityReduction(data_loader)
@@ -655,7 +763,7 @@ dr = DimensionalityReduction(data_loader)
 # Compute and plot PCA projection
 dr.plot_projection(dr.compute_pca(), 'PCA Projection')
 # Compute and plot UMAP projection
-# dr.plot_projection(dr.compute_umap(), 'UMAP Projection')
+dr.plot_projection(dr.compute_umap(), 'UMAP Projection')
 
 #%% 2- Hypothesis Testing
 
@@ -674,4 +782,13 @@ tester.perform_tests()
 
 #%% 3- Modeling
 
+# Initialize the FeatureCreation class with the data
+feature_creator = FeatureCreation(data_loader)
 
+print("\nFeatures Created:\n")
+
+feature_creator.create_modified_features()
+feature_creator.create_joined_features()
+feature_creator.create_interaction_features()
+
+data_visualization.plots(['correlation'])
