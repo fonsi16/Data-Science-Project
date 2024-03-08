@@ -327,8 +327,8 @@ class DimensionalityReduction:
         """
         self.data_loader = data_loader
 
-        # Sample 20% of the data
-        self.dataset = self.data_loader.data.sample(frac=0.05, random_state=42)
+        # Sample 30% of the data
+        self.dataset = self.data_loader.data.sample(frac=0.3, random_state=42)
 
         self.data = StandardScaler().fit_transform(self.data_loader.data.drop(columns=['HeartDisease']))
         self.target = self.data_loader.data['HeartDisease']
@@ -405,11 +405,6 @@ class HypothesisTester:
         self.KD_with_HD = data_loader.data['KidneyDisease'][data_loader.data['HeartDisease'] == 1]
         self.SC_with_HD = data_loader.data['SkinCancer'][data_loader.data['HeartDisease'] == 1]
 
-        self.With_HD = [self.BMI_with_HD, self.Smoke_with_HD, self.Alcohol_with_HD, self.Stroke_with_HD,
-                        self.PH_with_HD, self.MH_with_HD, self.DW_with_HD,
-                        self.Sex_with_HD, self.AC_with_HD, self.Diabetic_with_HD, self.PA_with_HD, self.GH_with_HD,
-                        self.ST_with_HD, self.Asthma_with_HD, self.KD_with_HD, self.SC_with_HD]
-
         # Column Data without Hearth Disease
         self.BMI_without_HD = data_loader.data['BMI'][data_loader.data['HeartDisease'] == 0]
         self.Smoke_without_HD = data_loader.data['Smoking'][data_loader.data['HeartDisease'] == 0]
@@ -428,11 +423,6 @@ class HypothesisTester:
         self.KD_without_HD = data_loader.data['KidneyDisease'][data_loader.data['HeartDisease'] == 0]
         self.SC_without_HD = data_loader.data['SkinCancer'][data_loader.data['HeartDisease'] == 0]
 
-        self.Without_HD = [self.BMI_without_HD, self.Smoke_without_HD, self.Alcohol_without_HD, self.Stroke_without_HD,
-                           self.PH_without_HD, self.MH_without_HD, self.DW_without_HD, self.Sex_without_HD,
-                           self.AC_without_HD, self.Diabetic_without_HD,self.PA_without_HD, self.GH_without_HD,
-                           self.ST_without_HD, self.Asthma_without_HD, self.KD_without_HD, self.SC_without_HD]
-
         self.variable_names = ['BMI_with_HD', 'Smoke_with_HD', 'Alcohol_with_HD', 'Stroke_with_HD', 'PH_with_HD', 'MH_with_HD', 'DW_with_HD',
                 'Sex_with_HD', 'AC_with_HD', 'Diabetic_with_HD', 'PA_with_HD', 'GH_with_HD', 'ST_with_HD',
                 'Asthma_with_HD', 'KD_with_HD', 'SC_with_HD', 'BMI_without_HD', 'Smoke_without_HD', 'Alcohol_without_HD',
@@ -447,6 +437,14 @@ class HypothesisTester:
                         self.PH_without_HD, self.MH_without_HD, self.DW_without_HD, self.Sex_without_HD,
                         self.AC_without_HD, self.Diabetic_without_HD, self.PA_without_HD, self.GH_without_HD,
                         self.ST_without_HD, self.Asthma_without_HD, self.KD_without_HD, self.SC_without_HD)
+
+        self.normal_distributed_variables_with_HD = []
+
+        self.normal_distributed_variables_without_HD = []
+
+        self.not_normal_distributed_variables_with_HD = []
+
+        self.not_normal_distributed_variables_without_HD = []
 
     def _wilcoxon_ranksum_test(self, group1, group2):
         """
@@ -479,41 +477,33 @@ class HypothesisTester:
         t_statistic, p_value = ttest_ind(group1, group2)
         return t_statistic, p_value
 
-    def paired_t_test(self, group1, group2):
-        """
-        Perform paired t-test for two groups.
-
-        Parameters:
-        - group1: List or array-like object containing data for group 1.
-        - group2: List or array-like object containing data for group 2.
-                  Should have the same length as group1.
-
-        Returns:
-        - t_statistic: The calculated t-statistic.
-        - p_value: The p-value associated with the t-statistic.
-        """
-        t_statistic, p_value = ttest_rel(group1, group2)
-        return t_statistic, p_value
-
     def perform_tests(self):
 
-        # Iterate over the indices of the arrays
-        for i in range(len(self.With_HD)):
+        print("\nUnpaired T-test tests for the normal distributed variables:")
+        # Iterate over the indices of the arrays of the normal distributed variables
+        for i in range(len(self.normal_distributed_variables_with_HD)):
+
             # Perform Unpaired T-Test
-            t_stat, p_val = tester.unpaired_t_test(self.With_HD[i], self.Without_HD[i])
+            t_stat, p_val = tester.unpaired_t_test(self.normal_distributed_variables_with_HD[i],
+                                                   self.normal_distributed_variables_without_HD[i])
 
             # Print the results
-            print(f"\nUnpaired T-test test between the array of {self.With_HD[i].name} with HeartDisease and the array without : ")
+            print(f"\nUnpaired T-test test between the array of "
+                  f"{self.normal_distributed_variables_with_HD[i].name} with HeartDisease and the array without : ")
             print("t-statistic:", t_stat)
             print("p-value:", p_val)
 
-        # Iterate over the indices of the arrays
-        for i in range(len(self.With_HD)):
+        print("\nWilcoxon rank-sum tests for the not normal distributed variables:")
+        # Iterate over the indices of the arrays of the not normal distributed variables
+        for i in range(len(self.not_normal_distributed_variables_with_HD)):
+
             # Perform Wilcoxon rank-sum test
-            statistic, p_value = self._wilcoxon_ranksum_test(self.With_HD[i], self.Without_HD[i])
+            statistic, p_value = self._wilcoxon_ranksum_test(self.not_normal_distributed_variables_with_HD[i],
+                                                             self.not_normal_distributed_variables_without_HD[i])
 
             # Print the results
-            print(f"\nWilcoxon rank-sum test between the array of {self.With_HD[i].name} with HeartDisease and the array without : ")
+            print(f"\nWilcoxon rank-sum test between the array of "
+                  f"{self.not_normal_distributed_variables_with_HD[i].name} with HeartDisease and the array without : ")
             print("Test statistic:", statistic)
             print("p-value:", p_value)
 
@@ -567,12 +557,35 @@ class HypothesisTester:
         print('\nNormality Test:\n')
 
         results = {}
+        normality = []
         for name, data in zip(self.variable_names, self.data_samples):
             results[name] = shapiro(data)
         for variable_name, shapiro_result in results.items():
             print(f'{variable_name}:')
             print(f'Shapiro-Wilk test - Test statistic: {shapiro_result.statistic}, p-value: {shapiro_result.pvalue}')
+
+            if shapiro_result.pvalue > 0.05:
+                normality.append(variable_name)
+
+        if normality:
+            print("\nThis variables seem normally distributed:", normality)
+        else:
+            print("\nNo variable seems normally distributed.")
+
         return results
+
+    def distribut_normality_data(self):
+
+        for variable_name, data_sample in zip(self.variable_names, self.data_samples):
+            if variable_name == 'BMI_with_HD':
+                tester.normal_distributed_variables_with_HD.append(data_sample)
+            elif variable_name == 'BMI_without_HD':
+                tester.normal_distributed_variables_without_HD.append(data_sample)
+            else:
+                if "with_HD" in variable_name:
+                    tester.not_normal_distributed_variables_with_HD.append(data_sample)
+                if "without_HD" in variable_name:
+                    tester.not_normal_distributed_variables_without_HD.append(data_sample)
 
 
 class FeatureCreation:
@@ -634,7 +647,7 @@ data_loader.data.to_csv('data/heart_2020_cleaned.csv', index=False)
 
 data_visualization_cleaned = DataVisualization(data_loader)
 data_visualization_cleaned.plots(['count'])
-data_visualization_cleaned.plots(['correlation', 'barh'])
+# data_visualization_cleaned.plots(['correlation', 'barh'])
 
 # Initialize DimensionalityReduction object with the dataset
 dr = DimensionalityReduction(data_loader)
@@ -642,16 +655,20 @@ dr = DimensionalityReduction(data_loader)
 # Compute and plot PCA projection
 dr.plot_projection(dr.compute_pca(), 'PCA Projection')
 # Compute and plot UMAP projection
-dr.plot_projection(dr.compute_umap(), 'UMAP Projection')
+# dr.plot_projection(dr.compute_umap(), 'UMAP Projection')
 
 #%% 2- Hypothesis Testing
 
 # Initialize the HypothesisTester class with the data
 tester = HypothesisTester(data_loader)
 
-# Perform normality analysis, first by visual checking using a Q-Q plot and then by normality test
-tester.qq_plots()
+# Perform normality analysis, first by normality test and then by visual checking using a Q-Q plot
 tester.test_normality()
+tester.qq_plots()
+
+# After the analysis of the normality test and Q-Q plots we decided the distribution of variables
+# We found from the Q-Q plots that the only normal distributed variables are BMI_with_HD and BMI_without_HD
+tester.distribut_normality_data()
 
 tester.perform_tests()
 
