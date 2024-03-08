@@ -235,14 +235,13 @@ class DataVisualization:
         """
         self.data_loader = data_loader
 
-        self.valid_plot_types = ['count', 'hist', 'correlation', 'box', 'barh']
+        self.valid_plot_types = ['correlation', 'box', 'barh']
 
-        self.feature_names = self.data_loader.data.columns.tolist()
         self.labels = self.data_loader.data['HeartDisease'].unique().tolist()
 
     def plot_all_features(self):
 
-        num_features = len(self.feature_names)
+        num_features = len(self.data_loader.data.columns.tolist())
         num_cols = 3  # Adjust the number of columns to control subplot arrangement
         num_rows = int(np.ceil(num_features / num_cols))
 
@@ -250,7 +249,7 @@ class DataVisualization:
 
         for idx, ax in enumerate(axes.flat):
             if idx < num_features:
-                ax.set_title(f'Feature {self.feature_names[idx]}', fontsize=12)
+                ax.set_title(f'Feature {self.data_loader.data.columns.tolist()[idx]}', fontsize=12)
                 ax.set_xlabel('Value', fontsize=10)
                 ax.set_ylabel('Frequency', fontsize=10)
                 ax.grid(True)
@@ -259,7 +258,7 @@ class DataVisualization:
                     # Add a plot per feature and label
                     for label in self.labels:
                         mask = np.array(self.data_loader.data['HeartDisease'] == label)
-                        ax.hist(self.data_loader.data.loc[mask, self.feature_names[idx]], bins=20, alpha=0.7, label=label)
+                        ax.hist(self.data_loader.data.loc[mask, self.data_loader.data.columns.tolist()[idx]], bins=20, alpha=0.7, label=label)
                     ax.legend()
 
         plt.tight_layout()
@@ -275,14 +274,9 @@ class DataVisualization:
 
             for feature in self.data_loader.data.columns:
                 # Create a figure with a single subplot for each feature
-                if plot_type == 'count' and feature in self.data_loader.categorical_features:
-                    fig, ax = plt.subplots(figsize=(8, 6))
-                    sns.countplot(x=feature, data=self.data_loader.data, hue=self.data_loader.data.target, ax=ax)
-                    ax.set_title(f'Countplot of {feature} by {self.data_loader.data.target}')
-                    plt.show()
                 if plot_type == 'box' and feature in self.data_loader.numerical_features:
                     fig, ax = plt.subplots(figsize=(8, 6))
-                    sns.boxplot(x='AlcoholDrinking', y=feature, data=self.data_loader.data, ax=ax, hue=self.data_loader.data.target)
+                    sns.boxplot(x=self.data_loader.data.target, y=feature, data=self.data_loader.data, ax=ax)
                     ax.set_title(f'Boxplot of {feature} by {self.data_loader.data.target}')
                     plt.show()
 
@@ -754,8 +748,8 @@ print(data_loader.data.info)
 # Save the cleaned dataset to a new csv file
 data_loader.data.to_csv('data/heart_2020_cleaned.csv', index=False)
 
-data_visualization.plots(['count'])
-data_visualization.plots(['correlation', 'barh'])
+data_visualization.plot_all_features()
+# data_visualization.plots(['correlation', 'barh'])
 
 # Initialize DimensionalityReduction object with the dataset
 dr = DimensionalityReduction(data_loader)
@@ -763,7 +757,7 @@ dr = DimensionalityReduction(data_loader)
 # Compute and plot PCA projection
 dr.plot_projection(dr.compute_pca(), 'PCA Projection')
 # Compute and plot UMAP projection
-dr.plot_projection(dr.compute_umap(), 'UMAP Projection')
+# dr.plot_projection(dr.compute_umap(), 'UMAP Projection')
 
 #%% 2- Hypothesis Testing
 
@@ -780,7 +774,7 @@ tester.distribut_normality_data()
 
 tester.perform_tests()
 
-#%% 3- Modeling
+#%% 3- Feature Creation
 
 # Initialize the FeatureCreation class with the data
 feature_creator = FeatureCreation(data_loader)
@@ -791,4 +785,5 @@ feature_creator.create_modified_features()
 feature_creator.create_joined_features()
 feature_creator.create_interaction_features()
 
+data_visualization.plot_all_features()
 data_visualization.plots(['correlation'])
