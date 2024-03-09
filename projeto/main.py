@@ -229,13 +229,13 @@ class DataCleaning:
 
 class DataVisualization:
 
-    def __init__(self, data_loader):
+    def __init__(self, data_loader, valid_plot_types):
         """
         Initializes the EDA class with a DataLoader object.
         """
         self.data_loader = data_loader
 
-        self.valid_plot_types = ['correlation', 'box', 'barh']
+        self.valid_plot_types = valid_plot_types
 
         self.labels = self.data_loader.data['HeartDisease'].unique().tolist()
 
@@ -729,7 +729,7 @@ data_loader = DataManipulator(path, 'HeartDisease')
 # Process all the data to numeric values and determine the range of values for each variable
 data_preprocessing = DataPreProcessing(data_loader)
 
-data_visualization = DataVisualization(data_loader)
+data_visualization = DataVisualization(data_loader, ['correlation', 'box', 'barh'])
 
 # Visualization of the outliers and all the histograms
 data_visualization.plot_all_features()
@@ -749,7 +749,7 @@ print(data_loader.data.info)
 data_loader.data.to_csv('data/heart_2020_cleaned.csv', index=False)
 
 data_visualization.plot_all_features()
-# data_visualization.plots(['correlation', 'barh'])
+data_visualization.plots(['correlation', 'barh'])
 
 # Initialize DimensionalityReduction object with the dataset
 dr = DimensionalityReduction(data_loader)
@@ -757,7 +757,7 @@ dr = DimensionalityReduction(data_loader)
 # Compute and plot PCA projection
 dr.plot_projection(dr.compute_pca(), 'PCA Projection')
 # Compute and plot UMAP projection
-# dr.plot_projection(dr.compute_umap(), 'UMAP Projection')
+dr.plot_projection(dr.compute_umap(), 'UMAP Projection')
 
 #%% 2- Hypothesis Testing
 
@@ -784,6 +784,9 @@ print("\nFeatures Created:\n")
 feature_creator.create_modified_features()
 feature_creator.create_joined_features()
 feature_creator.create_interaction_features()
+
+# Save the new dataset to a new csv file
+data_loader.data.to_csv('data/heart_2020_final.csv', index=False)
 
 data_visualization.plot_all_features()
 data_visualization.plots(['correlation'])
