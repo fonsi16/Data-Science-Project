@@ -315,7 +315,7 @@ class DataCleaning:
         If a feature has only two unique values, it is skipped as it is not suitable for outlier detection.
         After removing outliers, if a feature has only one unique value, it is considered redundant and is deleted from the dataset.
         """
-        print("\nDetecting outliers (only numerical values):")
+        print("\nDetecting outliers:")
         features_to_delete = []
         for feature in self.data_loader.data.columns:
             # Skip features with only two unique values
@@ -520,9 +520,9 @@ class DimensionalityReduction:
         """
         plt.figure(figsize=(8, 6))
         if projection.shape[1] == 1:
-            plt.scatter(projection, np.zeros_like(projection), c=self.target, alpha=0.5)
+            plt.scatter(projection, np.zeros_like(projection), c=self.target, alpha=0.5, cmap='viridis')
         else:
-            plt.scatter(projection[:, 0], projection[:, 1], c=self.target, alpha=0.5)
+            plt.scatter(projection[:, 0], projection[:, 1], c=self.target, alpha=0.5, cmap='viridis')
         plt.title(title)
         plt.xlabel('Component 1')
         plt.ylabel('Component 2')
@@ -556,7 +556,6 @@ class DimensionalityReduction:
         """
         return umap.UMAP(n_components=n_components, n_neighbors=n_neighbors, min_dist=min_dist,
                          metric=metric).fit_transform(self.data)
-
 
 class HypothesisTester:
     """
