@@ -1023,6 +1023,24 @@ class FeatureCreation:
         self._age_sleep_interaction_feature()
 
 
+class ModelBuilding:
+
+    def __init__(self, data_loader):
+        pass
+
+
+class ModelComparison:
+
+    def __init__(self, data_loader):
+        pass
+
+
+class ModelEvaluation:
+
+    def __init__(self, data_loader):
+        pass
+
+
 #%% 1- Pre Processing and EDA
 
 path = 'data/heart_2020.csv'
