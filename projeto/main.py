@@ -5,11 +5,16 @@ import seaborn as sns
 import matplotlib.pyplot as plt
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.inspection import permutation_importance
+from sklearn.neighbors import KNeighborsClassifier
 from sklearn.preprocessing import StandardScaler
 from sklearn.decomposition import PCA
+from sklearn.model_selection import train_test_split, KFold
+from sklearn.metrics import accuracy_score
 import umap
 from scipy.stats import ttest_ind, probplot, shapiro
 import statsmodels.stats.api as sms
+from pycm import ConfusionMatrix
+import joblib
 
 
 class DataLoader:
@@ -557,6 +562,7 @@ class DimensionalityReduction:
         return umap.UMAP(n_components=n_components, n_neighbors=n_neighbors, min_dist=min_dist,
                          metric=metric).fit_transform(self.data)
 
+
 class HypothesisTester:
     """
     Class for performing hypothesis tests and generating Q-Q plots.
@@ -1023,22 +1029,192 @@ class FeatureCreation:
         self._age_sleep_interaction_feature()
 
 
+class ModelOptimization:
+
+    def __init__(self, X_train, y_train, X_val, y_val):
+
+        self.X_train = X_train
+        self.y_train = y_train
+        self.X_val = X_val
+        self.y_val = y_val
+
+    def optimize_knn(self, k_values):
+        best_k = None
+        best_accuracy = -1
+
+        for k in k_values:
+            knn = KNeighborsClassifier(n_neighbors=k)
+            knn.fit(self.X_train, self.y_train)
+            accuracy = knn.score(self.X_val, self.y_val)
+            print(f"k = {k}, Accuracy = {accuracy}")
+            if accuracy > best_accuracy:
+                best_accuracy = accuracy
+                best_k = k
+
+        print("Best k value:", best_k)
+        print("Best accuracy:", best_accuracy)
+        return best_k
+
+
+class CrossValidator:
+
+    def __init__(self, k=5):
+
+        self.k = k
+        self.kf = KFold(n_splits=k, shuffle=True)
+        self.cm = None
+        self.accuracy_scores = []
+        self.sensitivity_scores = []
+        self.specificity_scores = []
+
+    def cross_validate(self, model, X, y):
+
+        for train_index, val_index in self.kf.split(X):
+
+            X_train, X_val = X[train_index], X[val_index]
+            y_train, y_val = y[train_index], y[val_index]
+
+            model.fit(X_train, y_train)
+            y_pred = model.predict(X_val)
+
+            self.cm = ConfusionMatrix(actual_vector=list(y_val), predict_vector=list(y_pred))
+
+            self.accuracy_scores.append(accuracy_score(y_val, y_pred))
+            self.sensitivity_scores.append(float(self.cm.TPR_Macro))
+            self.specificity_scores.append(float(self.cm.TNR_Macro))
+
+        avg_accuracy = sum(self.accuracy_scores) / len(self.accuracy_scores)
+        avg_sensitivity = sum(self.sensitivity_scores) / len(self.sensitivity_scores)
+        avg_specificity = sum(self.specificity_scores) / len(self.specificity_scores)
+
+        return avg_accuracy, avg_sensitivity, avg_specificity
+
+    def evaluate_on_test_set(self, model, X_test, y_test):
+        """
+        Evaluates the trained model on the test set.
+
+        Parameters:
+            model: Trained machine learning model.
+            X_test (array-like): Test features.
+            y_test (array-like): Test labels.
+
+        Returns:
+            tuple: Accuracy, sensitivity, and specificity scores on the test set.
+        """
+        y_pred = model.predict(X_test)
+        cm = ConfusionMatrix(actual_vector=list(y_test), predict_vector=list(y_pred))
+        accuracy = cm.Overall_ACC
+        sensitivity = cm.TPR_Macro
+        specificity = cm.TNR_Macro
+        return accuracy, sensitivity, specificity
+
+
 class ModelBuilding:
 
-    def __init__(self, data_loader):
-        pass
+    def __init__(self, X_train, y_train, X_test, y_test, k=5, validation_size=0.2, save_all=True):
+
+        self.X_train_complete = X_train
+        self.y_train_complete = y_train
+        self.X_train, self.X_val, self.y_train, self.y_val = train_test_split(X_train, y_train, test_size=validation_size)
+        self.X_test = X_test
+        self.y_test = y_test
+        self.k = k
+        self.save_all = save_all
+        self.best_model = None
+        self.best_model_name = None
+        self.best_params = None
+        self.best_score = -1
+        self.history = {}
+
+    def build_models(self, models_dict):
+
+        model_optimization = ModelOptimization(self.X_train, self.y_train, self.X_val, self.y_val)
+
+        for name, model_params in models_dict.items():
+
+            print("\nTraining", name, "model")
+            model = model_params.pop('model')
+            model_params_check = {}
+
+            if model == KNeighborsClassifier:
+
+                k = model_optimization.optimize_knn(model_params['n_neighbors'])
+                model_params_check['n_neighbors'] = k
+                params = {'n_neighbors': k}
+
+            else:
+                raise ValueError("Model type is not supported.")
+
+            # Check the performance of the optimized model parameters on the validation data
+            model_instance = model(**model_params_check)
+            model_instance.fit(self.X_train, self.y_train)
+            val_score = model_instance.score(self.X_val, self.y_val)
+            self.history[str(name)] = val_score
+
+            if val_score > self.best_score:
+                print("New best model found!")
+                self.best_score = val_score
+                self.best_model = model_instance
+                self.best_model_name = name
+                self.best_params = params
+                self.best_model_checked = model
+                self.best_model_params_checked = model_params_check
+
+            if self.save_all:
+                self.save_model(model_instance, name)
+
+        print("Optimization finished, history:\n")
+        print("Model name\t\tAccuracy")  # Print header
+        for model, accuracy in self.history.items():  # Print table rows
+            print(f"{model}\t\t{accuracy}")
+        print("\nBest performing model:", self.best_model_name)
+        print("Best validation score:", self.best_score)
+        print("Best parameters:", self.best_params)
+
+        if not self.save_all:
+            self.save_model(self.best_model, self.best_model_name)
+
+        # Evaluate best found model using CrossValidator
+        self.kf_cv = CrossValidator(k=self.k)
+        self.avg_accuracy, self.avg_sensitivity, self.avg_specificity = self.kf_cv.cross_validate(
+            self.best_model_checked(**self.best_model_params_checked), self.X_train_complete, self.y_train_complete)
+
+        print("Average accuracy during cross-validation:", self.avg_accuracy)
+        print("Average sensitivity during cross-validation:", self.avg_sensitivity)
+        print("Average specificity during cross-validation:", self.avg_specificity)
+
+        return self.history, self.avg_accuracy, self.avg_sensitivity, self.avg_specificity
+
+    def evaluate_best_model(self):
+
+        print("\nEvaluating best model on test set!")
+        test_score = self.best_model.score(self.X_test, self.y_test)
+        print("Test set score:", test_score)
+
+    def save_model(self, model, filename):
+
+        print("Saving model as ", filename)
+        joblib.dump(model, filename)
 
 
-class ModelComparison:
+# def KNearestNeighbors(X_val, X_train, y_val, y_train, k):
+#
+#     correct_count = 0
+#
+#     for i in range(len(X_val)):
+#         print(f"Processing instance {i} out of {len(X_val)}")
+#
+#         distances = [np.sqrt(np.sum((X_val[i] - x_train) ** 2)) for x_train in X_train]
+#         nearest_indices = np.argsort(distances)[:k]
+#         nearest_labels = [y_train[index] for index in nearest_indices]
+#         predicted_label = max(set(nearest_labels), key=nearest_labels.count)
+#
+#         if predicted_label == y_val[i]:
+#             correct_count += 1
+#
+#     accuracy = correct_count / len(X_val)
+#     return accuracy
 
-    def __init__(self, data_loader):
-        pass
-
-
-class ModelEvaluation:
-
-    def __init__(self, data_loader):
-        pass
 
 
 #%% 1- Pre Processing and EDA
@@ -1056,8 +1232,8 @@ data_preprocessing = DataPreProcessing(data_loader)
 data_visualization = DataVisualization(data_loader, ['correlation', 'box', 'barh'])
 
 # Visualization of the outliers (box plots) and all the histograms
-data_visualization.plot_all_features()
-data_visualization.plots(['box'])
+#data_visualization.plot_all_features()
+#data_visualization.plots(['box'])
 
 # Initialize DataCleaning class with the dataset
 data_cleaner = DataCleaning(data_loader)
@@ -1074,16 +1250,16 @@ print(data_loader.data.info)
 data_loader.data.to_csv('data/heart_2020_cleaned.csv', index=False)
 
 # Visualization of all the histograms, correlation and barh plots
-data_visualization.plot_all_features()
-data_visualization.plots(['correlation', 'barh'])
+#data_visualization.plot_all_features()
+#data_visualization.plots(['correlation', 'barh'])
 
 # Initialize DimensionalityReduction class with the dataset
 dr = DimensionalityReduction(data_loader)
 
 # Compute and plot PCA projection
-dr.plot_projection(dr.compute_pca(), 'PCA Projection')
+#dr.plot_projection(dr.compute_pca(), 'PCA Projection')
 # Compute and plot UMAP projection
-dr.plot_projection(dr.compute_umap(), 'UMAP Projection')
+#dr.plot_projection(dr.compute_umap(), 'UMAP Projection')
 
 #%% 2- Hypothesis Testing
 
@@ -1091,15 +1267,15 @@ dr.plot_projection(dr.compute_umap(), 'UMAP Projection')
 tester = HypothesisTester(data_loader)
 
 # Perform normality analysis, first by normality test and then by visual checking using a Q-Q plot
-tester.test_normality()
-tester.qq_plots()
+#tester.test_normality()
+#tester.qq_plots()
 
 # After the analysis of the normality test and Q-Q plots we decided the distribution of variables
 # We found from the Q-Q plots that the only normal distributed variables are BMI_with_HD and BMI_without_HD
-tester.distribute_normality_data()
+#tester.distribute_normality_data()
 
 # Perform the hypothesis tests
-tester.perform_tests()
+#tester.perform_tests()
 
 #%% 3- Feature Creation
 
@@ -1117,5 +1293,26 @@ feature_creator.create_interaction_features()
 data_loader.data.to_csv('data/heart_2020_final.csv', index=False)
 
 # Visualization of all the final histograms and correlation plot
-data_visualization.plot_all_features()
-data_visualization.plots(['correlation'])
+#data_visualization.plot_all_features()
+#data_visualization.plots(['correlation'])
+
+#%% 4- Model Building
+
+# Divide the data into features and target variable
+X = data_loader.data.drop(columns=[data_loader.target])
+y = data_loader.data[data_loader.target]
+
+# Split the data into training and testing sets
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+
+# Define the model dictionary for the optimization
+models_dict = {
+    "KNN": {"model": KNeighborsClassifier, "n_neighbors": (3, 5, 7, 10)},
+}
+
+# Create an instance of ModelBuilder
+builder = ModelBuilding(np.array(X_train), np.array(y_train), np.array(X_test), np.array(y_test))
+
+# Build the models
+builder.build_models(models_dict)
+builder.evaluate_best_model()
