@@ -15,6 +15,7 @@ from scipy.stats import ttest_ind, probplot, shapiro
 import statsmodels.stats.api as sms
 from pycm import ConfusionMatrix
 import joblib
+import os
 
 
 class DataLoader:
@@ -1039,14 +1040,17 @@ class ModelOptimization:
         self.y_val = y_val
 
     def optimize_knn(self, k_values):
+
         best_k = None
         best_accuracy = -1
 
         for k in k_values:
+
             knn = KNeighborsClassifier(n_neighbors=k)
             knn.fit(self.X_train, self.y_train)
             accuracy = knn.score(self.X_val, self.y_val)
             print(f"k = {k}, Accuracy = {accuracy}")
+
             if accuracy > best_accuracy:
                 best_accuracy = accuracy
                 best_k = k
@@ -1193,8 +1197,10 @@ class ModelBuilding:
 
     def save_model(self, model, filename):
 
-        print("Saving model as ", filename)
-        joblib.dump(model, filename)
+        folder_path = "./models"
+        full_path = os.path.join(folder_path, filename)
+        print("Saving model as", filename)
+        joblib.dump(model, full_path)
 
 
 # def KNearestNeighbors(X_val, X_train, y_val, y_train, k):
@@ -1307,7 +1313,7 @@ X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_
 
 # Define the model dictionary for the optimization
 models_dict = {
-    "KNN": {"model": KNeighborsClassifier, "n_neighbors": (3, 5, 7, 10)},
+    "KNN": {"model": KNeighborsClassifier, "n_neighbors": (3, 5, 7)},
 }
 
 # Create an instance of ModelBuilder
