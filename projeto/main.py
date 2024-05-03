@@ -6,6 +6,8 @@ import matplotlib.pyplot as plt
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.inspection import permutation_importance
 from sklearn.neighbors import KNeighborsClassifier
+from sklearn.linear_model import LogisticRegression
+from sklearn.tree import DecisionTreeClassifier
 from sklearn.preprocessing import StandardScaler
 from sklearn.decomposition import PCA
 from sklearn.model_selection import train_test_split, KFold
@@ -1059,6 +1061,60 @@ class ModelOptimization:
         print("Best accuracy:", best_accuracy)
         return best_k
 
+    def optimize_logistic_regression(self, C_values=(0.1, 1.0, 10.0), penalty=('l1', 'l2')):
+        """
+        Optimizes the parameters for Logistic Regression classifier.
+
+        Parameters:
+            C_values (tuple): Values to try for regularization parameter C. Default is (0.1, 1.0, 10.0).
+            penalty (tuple): Regularization penalty to try. Default is ('l1', 'l2').
+
+        Returns:
+            tuple: Best parameters for Logistic Regression (C, penalty).
+        """
+        best_accuracy = -1
+        best_c = None
+        best_penalty = None
+        for c in C_values:
+            for penalty_seleected in penalty:
+                lr = LogisticRegression(C=c, penalty=penalty_seleected, solver='saga', multi_class='auto')
+                lr.fit(self.X_train, self.y_train)
+                accuracy = lr.score(self.X_val, self.y_val)
+                print(f"C = {c}, Penalty = {penalty_seleected}, Accuracy = {accuracy}")
+                if accuracy > best_accuracy:
+                    best_accuracy = accuracy
+                    best_c = c
+                    best_penalty = penalty_seleected
+        print("Best c value:", best_c)
+        print("Best penalty:", best_penalty)
+        print("Best accuracy:", best_accuracy)
+        return best_c, best_penalty
+
+    def optimize_decision_tree(self, max_depth_values=(None, 10, 20)):
+        """
+        Optimizes the parameters for Decision Tree classifier.
+
+        Parameters:
+            max_depth_values (tuple): Values to try for maximum depth. Default is (None, 10, 20).
+
+        Returns:
+            tuple: Best parameters for Decision Tree (max depth).
+        """
+        best_accuracy = -1
+        best_max_depth = None
+        for max_depth in max_depth_values:
+            dt = DecisionTreeClassifier(max_depth=max_depth)
+            dt.fit(self.X_train, self.y_train)
+            accuracy = dt.score(self.X_val, self.y_val)
+            print(f"Max depth = {max_depth}, Accuracy = {accuracy}")
+            if accuracy > best_accuracy:
+                best_accuracy = accuracy
+                best_max_depth = max_depth
+        print("Best max depth value:", best_max_depth)
+        print("Best accuracy:", best_accuracy)
+        return best_max_depth
+
+
 
 class CrossValidator:
 
@@ -1146,6 +1202,19 @@ class ModelBuilding:
                 model_params_check['n_neighbors'] = k
                 params = {'n_neighbors': k}
 
+            elif model == LogisticRegression:
+              
+                lr_params = model_optimization.optimize_logistic_regression(**model_params)
+                model_params_check['C'] = lr_params[0]
+                model_params_check['penalty'] = lr_params[1]
+                params = lr_params
+
+            elif model == DecisionTreeClassifier:
+              
+                dt_params = model_optimization.optimize_decision_tree(**model_params)
+                model_params_check['max_depth'] = dt_params
+                params = dt_params
+
             else:
                 raise ValueError("Model type is not supported.")
 
@@ -1156,6 +1225,7 @@ class ModelBuilding:
             self.history[str(name)] = val_score
 
             if val_score > self.best_score:
+              
                 print("New best model found!")
                 self.best_score = val_score
                 self.best_model = model_instance
@@ -1314,6 +1384,8 @@ X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_
 # Define the model dictionary for the optimization
 models_dict = {
     "KNN": {"model": KNeighborsClassifier, "n_neighbors": (3, 5, 7)},
+    "LogisticRegression": {"model": LogisticRegression, "C_values": (0.1, 1.0, 10.0), "penalty": (None, 'l2')},
+    "DecisionTree": {"model": DecisionTreeClassifier, "max_depth_values": (None, 10, 20)}
 }
 
 # Create an instance of ModelBuilder
