@@ -12,12 +12,17 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.decomposition import PCA
 from sklearn.model_selection import train_test_split, KFold
 from sklearn.metrics import accuracy_score
+from sklearn.base import clone
 import umap
 from scipy.stats import ttest_ind, probplot, shapiro
 import statsmodels.stats.api as sms
 from pycm import ConfusionMatrix
 import joblib
 import os
+import pickle
+from tensorflow.keras.callbacks import EarlyStopping
+from tensorflow.keras.models import Sequential
+from tensorflow.keras.layers import Dense
 
 
 class DataLoader:
@@ -1115,7 +1120,6 @@ class ModelOptimization:
         return best_max_depth
 
 
-
 class CrossValidator:
 
     def __init__(self, k=5):
@@ -1292,6 +1296,98 @@ class ModelBuilding:
 #     return accuracy
 
 
+class BaggingClassifier:
+    """
+    Performs bagging with a provided model.
+    """
+
+    def __init__(self, base_model, X_train, y_train, X_test, y_test, n_straps=100, k_fold=5):
+        """
+        Initializes the BaggingClassifier object.
+
+        Parameters:
+            base_model: Base machine learning model to use for bagging.
+            n_straps (int): Number of bootstrap samples. Default is 10.
+            k_fold (int): Number of folds for cross-validation. Default is 5.
+        """
+        self.base_model = base_model
+        self.n_straps = n_straps
+        self.k_fold = k_fold
+        self.models = []
+        self.X_train, self.y_train = X_train, y_train
+        self.X_test = X_test
+        self.y_test = y_test
+        self.accuracy_scores = []
+        self.sensitivity_scores = []
+        self.specificity_scores = []
+
+    def examine_bagging(self):
+        """
+        Fits the bagging ensemble on the training data with k fold cross-validation.
+        """
+        kfold = KFold(n_splits=self.k_fold, shuffle=True)
+        for train_index, val_index in kfold.split(self.X_train):
+            # Generate n_straps samples and train the models for the current fold
+            self.models = []
+            for _ in range(self.n_straps):
+                # Create bootstrap sample with the available indices of the fold
+                bootstrap_indices = np.random.choice(train_index, size=len(self.X_train[train_index]), replace=True)
+                X_bootstrap = self.X_train[bootstrap_indices]
+                y_bootstrap = self.y_train[bootstrap_indices]
+
+                # Train base model on bootstrap sample
+                model = clone(self.base_model)
+                model.fit(X_bootstrap, y_bootstrap)
+                self.models.append(model)
+
+            y_pred = self.predict(self.X_train[val_index])
+
+            self.cm = ConfusionMatrix(actual_vector=list(self.y_train[val_index]), predict_vector=list(y_pred))
+            self.accuracy_scores.append(accuracy_score(self.y_train[val_index], y_pred))
+            print(self.cm)
+            self.sensitivity_scores.append(float(self.cm.TPR_Macro))
+            self.specificity_scores.append(float(self.cm.TNR_Macro))
+
+        self.avg_accuracy = sum(self.accuracy_scores) / len(self.accuracy_scores)
+        self.avg_sensitivity = sum(self.sensitivity_scores) / len(self.sensitivity_scores)
+        self.avg_specificity = sum(self.specificity_scores) / len(self.specificity_scores)
+
+        return self.avg_accuracy, self.avg_sensitivity, self.avg_specificity
+
+    def predict(self, X):
+        """
+        Predicts class labels for input data.
+
+        Parameters:
+            X (array-like): Input features.
+
+        Returns:
+            array-like: Predicted class labels.
+        """
+        # Aggregate predictions from all models
+        predictions = np.zeros((len(X), self.n_straps))
+        for i, model in enumerate(self.models):
+            predictions[:, i] = model.predict(X)
+
+        # Use majority voting to determine final prediction
+        final_predictions = np.apply_along_axis(lambda x: np.bincount(x.astype(int)).argmax(), axis=1, arr=predictions)
+        return final_predictions
+
+    def evaluate(self):
+        """
+        Evaluates the bagging ensemble on test data.
+
+        Returns:
+            tuple: Average accuracy, sensitivity, and specificity scores.
+        """
+        self.y_pred = self.predict(self.X_test)
+        self.cm = ConfusionMatrix(actual_vector=list(self.y_test), predict_vector=list(self.y_pred))
+        self.accuracy_scores = accuracy_score(self.y_test, self.y_pred)
+        self.sensitivity_scores = float(self.cm.TPR_Macro)
+        self.specificity_scores = float(self.cm.TNR_Macro)
+        print(f"Accuracy: {self.accuracy_scores}, Sensitivity: {self.sensitivity_scores}, Specificity: {self.specificity_scores}")
+        return self.accuracy_scores, self.sensitivity_scores, self.specificity_scores
+
 
 #%% 1- Pre Processing and EDA
 
@@ -1394,3 +1490,25 @@ builder = ModelBuilding(np.array(X_train), np.array(y_train), np.array(X_test), 
 # Build the models
 builder.build_models(models_dict)
 builder.evaluate_best_model()
+
+# Serialize the builder object
+with open('builder.pkl', 'wb') as f:
+    pickle.dump(builder, f)
+
+with open('builder.pkl', 'rb') as f:
+  builder = pickle.load(f)
+print("\nBest model:", builder.best_model_checked)
+print("Best model parameters:", builder.best_model_params_checked)
+
+# Perform bagging on the best model
+bagging = BaggingClassifier(builder.best_model_checked(**builder.best_model_params_checked), np.array(X_train),
+                            np.array(y_train), np.array(X_test), np.array(y_test))
+bagging.examine_bagging()
+bagging.evaluate()
+
+# Perform AdaBoost on the best model
+#adaboost = AdaBoostClassifier(np.array(X_train), np.array(y_train), np.array(X_test), np.array(y_test), builder)
+#adaboost.train_adaboost()
+#adaboost.evaluate()
+
+
