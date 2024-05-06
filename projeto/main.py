@@ -1,4 +1,4 @@
-#%% 0- Classes
+# %% 0- Classes
 import pandas as pd
 import numpy as np
 import seaborn as sns
@@ -22,7 +22,7 @@ import os
 import pickle
 from tensorflow.keras.callbacks import EarlyStopping
 from tensorflow.keras.models import Sequential
-from tensorflow.keras.layers import Dense
+from tensorflow.keras.layers import Dense, ZeroPadding2D
 
 #import warnings
 #warnings.filterwarnings("ignore")
@@ -196,7 +196,8 @@ class DataPreProcessing:
         Displays the range of values for each variable without considering the class label.
         """
         print("\nRange of values for each variable:")
-        print(self.data_loader.data.drop(columns=["HeartDisease"]).max() - self.data_loader.data.drop(columns=["HeartDisease"]).min())
+        print(self.data_loader.data.drop(columns=["HeartDisease"]).max() - self.data_loader.data.drop(
+            columns=["HeartDisease"]).min())
 
     def _age_encode(self):
         """
@@ -243,7 +244,8 @@ class DataPreProcessing:
 
         # Encode AgeCategory, Race, and GenHealth
         self._age_encode()
-        self._encode_numerical_values("Race", {"White": 1, "Black": 2, "Hispanic": 3, "Asian": 4, "American Indian/Alaskan Native": 5, "Other": 6})
+        self._encode_numerical_values("Race", {"White": 1, "Black": 2, "Hispanic": 3, "Asian": 4,
+                                               "American Indian/Alaskan Native": 5, "Other": 6})
         self._encode_numerical_values("GenHealth", {"Excellent": 5, "Very good": 4, "Good": 3, "Fair": 2, "Poor": 1})
 
         # Fill the numerical and categorical features arrays
@@ -313,14 +315,14 @@ class DataCleaning:
             self.data_loader.data = self.data_loader.data.dropna()
 
     def remove_duplicates(self):
-            """
+        """
             This method checks for duplicate rows in the dataset and removes them if any are found.
             It prints the number of duplicate rows before and after the removal process.
             """
-            print("Duplicate Rows:", self.data_loader.data.duplicated().sum())
+        print("Duplicate Rows:", self.data_loader.data.duplicated().sum())
 
-            if self.data_loader.data.duplicated().sum() > 0:
-                self.data_loader.data = self.data_loader.data.drop_duplicates(keep='first')
+        if self.data_loader.data.duplicated().sum() > 0:
+            self.data_loader.data = self.data_loader.data.drop_duplicates(keep='first')
 
     def detect_and_remove_outliers(self):
         """
@@ -377,6 +379,7 @@ class DataVisualization:
         plot_all_features(): Plots histograms for all features in the dataset.
         plots(plot_types): Plots the specified types of plots for each feature in the dataset.
     """
+
     def __init__(self, data_loader, valid_plot_types):
         """
         Initializes the DataVisualization class with a DataLoader object.
@@ -420,7 +423,8 @@ class DataVisualization:
                     # Add a plot per feature and label
                     for label in self.labels:
                         mask = np.array(self.data_loader.data[self.data_loader.target] == label)
-                        ax.hist(self.data_loader.data.loc[mask, self.data_loader.data.columns.tolist()[idx]], bins=20, alpha=0.7, label=label)
+                        ax.hist(self.data_loader.data.loc[mask, self.data_loader.data.columns.tolist()[idx]], bins=20,
+                                alpha=0.7, label=label)
                     ax.legend()
 
         plt.tight_layout()
@@ -676,20 +680,24 @@ class HypothesisTester:
         self.KD_without_HD = self.data_loader.data['KidneyDisease'][self.data_loader.data['HeartDisease'] == 0]
         self.SC_without_HD = self.data_loader.data['SkinCancer'][self.data_loader.data['HeartDisease'] == 0]
 
-        self.variable_names = ['BMI_with_HD', 'Smoke_with_HD', 'Alcohol_with_HD', 'Stroke_with_HD', 'PH_with_HD', 'MH_with_HD', 'DW_with_HD',
-                'Sex_with_HD', 'AC_with_HD', 'Diabetic_with_HD', 'PA_with_HD', 'GH_with_HD', 'ST_with_HD',
-                'Asthma_with_HD', 'KD_with_HD', 'SC_with_HD', 'BMI_without_HD', 'Smoke_without_HD', 'Alcohol_without_HD',
-                'Stroke_without_HD', 'PH_without_HD', 'MH_without_HD', 'DW_without_HD', 'Sex_without_HD', 'AC_without_HD',
-                'Diabetic_without_HD', 'PA_without_HD', 'GH_without_HD', 'ST_without_HD',
-                'Asthma_without_HD', 'KD_without_HD', 'SC_without_HD']
+        self.variable_names = ['BMI_with_HD', 'Smoke_with_HD', 'Alcohol_with_HD', 'Stroke_with_HD', 'PH_with_HD',
+                               'MH_with_HD', 'DW_with_HD',
+                               'Sex_with_HD', 'AC_with_HD', 'Diabetic_with_HD', 'PA_with_HD', 'GH_with_HD',
+                               'ST_with_HD',
+                               'Asthma_with_HD', 'KD_with_HD', 'SC_with_HD', 'BMI_without_HD', 'Smoke_without_HD',
+                               'Alcohol_without_HD',
+                               'Stroke_without_HD', 'PH_without_HD', 'MH_without_HD', 'DW_without_HD', 'Sex_without_HD',
+                               'AC_without_HD',
+                               'Diabetic_without_HD', 'PA_without_HD', 'GH_without_HD', 'ST_without_HD',
+                               'Asthma_without_HD', 'KD_without_HD', 'SC_without_HD']
         self.data_samples = (self.BMI_with_HD, self.Smoke_with_HD, self.Alcohol_with_HD,
-                        self.Stroke_with_HD, self.PH_with_HD, self.MH_with_HD, self.DW_with_HD, self.Sex_with_HD,
-                        self.AC_with_HD, self.Diabetic_with_HD, self.PA_with_HD, self.GH_with_HD, self.ST_with_HD,
-                        self.Asthma_with_HD, self.KD_with_HD, self.SC_with_HD, self.BMI_without_HD,
-                        self.Smoke_without_HD, self.Alcohol_without_HD,self.Stroke_without_HD,
-                        self.PH_without_HD, self.MH_without_HD, self.DW_without_HD, self.Sex_without_HD,
-                        self.AC_without_HD, self.Diabetic_without_HD, self.PA_without_HD, self.GH_without_HD,
-                        self.ST_without_HD, self.Asthma_without_HD, self.KD_without_HD, self.SC_without_HD)
+                             self.Stroke_with_HD, self.PH_with_HD, self.MH_with_HD, self.DW_with_HD, self.Sex_with_HD,
+                             self.AC_with_HD, self.Diabetic_with_HD, self.PA_with_HD, self.GH_with_HD, self.ST_with_HD,
+                             self.Asthma_with_HD, self.KD_with_HD, self.SC_with_HD, self.BMI_without_HD,
+                             self.Smoke_without_HD, self.Alcohol_without_HD, self.Stroke_without_HD,
+                             self.PH_without_HD, self.MH_without_HD, self.DW_without_HD, self.Sex_without_HD,
+                             self.AC_without_HD, self.Diabetic_without_HD, self.PA_without_HD, self.GH_without_HD,
+                             self.ST_without_HD, self.Asthma_without_HD, self.KD_without_HD, self.SC_without_HD)
 
         self.normal_distributed_variables_with_HD = []
 
@@ -739,10 +747,9 @@ class HypothesisTester:
         print("\nUnpaired T-test tests for the normal distributed variables:")
         # Iterate over the indices of the arrays of the normal distributed variables
         for i in range(len(self.normal_distributed_variables_with_HD)):
-
             # Perform Unpaired T-Test
             t_stat, p_val = self._unpaired_t_test(self.normal_distributed_variables_with_HD[i],
-                                                   self.normal_distributed_variables_without_HD[i])
+                                                  self.normal_distributed_variables_without_HD[i])
 
             # Print the results
             print(f"\nUnpaired T-test test between the array of "
@@ -753,7 +760,6 @@ class HypothesisTester:
         print("\nWilcoxon rank-sum tests for the not normal distributed variables:")
         # Iterate over the indices of the arrays of the not normal distributed variables
         for i in range(len(self.not_normal_distributed_variables_with_HD)):
-
             # Perform Wilcoxon rank-sum test
             statistic, p_value = self._wilcoxon_ranksum_test(self.not_normal_distributed_variables_with_HD[i],
                                                              self.not_normal_distributed_variables_without_HD[i])
@@ -791,6 +797,7 @@ class HypothesisTester:
         # Adjust layout and show plots
         plt.tight_layout()
         plt.show()
+
     def test_normality(self):
         """
         Test the normality of multiple data samples using Shapiro-Wilk test.
@@ -1123,10 +1130,9 @@ class ModelOptimization:
         return best_max_depth
 
 
-class CrossValidator:
+ class CrossValidator:
 
     def __init__(self, k=5):
-
         self.k = k
         self.kf = KFold(n_splits=k, shuffle=True)
         self.cm = None
@@ -1135,9 +1141,7 @@ class CrossValidator:
         self.specificity_scores = []
 
     def cross_validate(self, model, X, y):
-
         for train_index, val_index in self.kf.split(X):
-
             X_train, X_val = X[train_index], X[val_index]
             y_train, y_val = y[train_index], y[val_index]
 
@@ -1182,7 +1186,8 @@ class ModelBuilding:
 
         self.X_train_complete = X_train
         self.y_train_complete = y_train
-        self.X_train, self.X_val, self.y_train, self.y_val = train_test_split(X_train, y_train, test_size=validation_size)
+        self.X_train, self.X_val, self.y_train, self.y_val = train_test_split(X_train, y_train,
+                                                                              test_size=validation_size)
         self.X_test = X_test
         self.y_test = y_test
         self.k = k
@@ -1210,14 +1215,14 @@ class ModelBuilding:
                 params = {'n_neighbors': k}
 
             elif model == LogisticRegression:
-              
+
                 lr_params = model_optimization.optimize_logistic_regression(**model_params)
                 model_params_check['C'] = lr_params[0]
                 model_params_check['penalty'] = lr_params[1]
                 params = lr_params
 
             elif model == DecisionTreeClassifier:
-              
+
                 dt_params = model_optimization.optimize_decision_tree(**model_params)
                 model_params_check['max_depth'] = dt_params
                 params = dt_params
@@ -1232,7 +1237,6 @@ class ModelBuilding:
             self.history[str(name)] = val_score
 
             if val_score > self.best_score:
-              
                 print("New best model found!")
                 self.best_score = val_score
                 self.best_model = model_instance
@@ -1392,7 +1396,130 @@ class BaggingClassifier:
         return self.accuracy_scores, self.sensitivity_scores, self.specificity_scores
 
 
-#%% 1- Pre Processing and EDA
+class TransferLearningModel:
+    """
+    A class for transfer learning with pre-trained models.
+
+    Attributes:
+        train_data (DataFrame): The training data.
+        train_labels (array-like): The training labels.
+        test_data (DataFrame): The test data.
+        test_labels (array-like): The test labels.
+        num_classes (int): The number of classes in the classification task.
+
+    Methods:
+        preprocess_data(): Preprocesses the input data for transfer learning.
+        pad_images(images): Pads input images to meet the minimum size requirement.
+        transfer_learning(): Performs transfer learning using MobileNetV2.
+    """
+    def __init__(self, train_data, train_labels, test_data, test_labels, num_classes):
+        """
+        Initializes the TransferLearningModel with input data and parameters.
+
+        Args:
+            train_data (DataFrame): The training data.
+            train_labels (array-like): The training labels.
+            test_data (DataFrame): The test data.
+            test_labels (array-like): The test labels.
+            num_classes (int): The number of classes in the classification task.
+        """
+        self.train_data = train_data
+        self.train_labels = train_labels
+        self.test_data = test_data
+        self.test_labels = test_labels
+        self.num_classes = num_classes
+
+    def preprocess_data(self):
+        """
+        Preprocesses the input data for transfer learning.
+
+        Returns:
+            tuple: Tuple containing preprocessed training and test images.
+        """
+        # Convert DataFrame to NumPy array
+        train_data_array = self.train_data.values
+        test_data_array = self.test_data.values
+
+        # Reshape the data to (num_samples, height, width, channels)
+        train_images = train_data_array.reshape(-1, 5, 8, 1)
+        test_images = test_data_array.reshape(-1, 5, 8, 1)
+
+        # Convert the images to black and white (grayscale)
+        train_images_bw = np.mean(train_images, axis=3, keepdims=True)
+        test_images_bw = np.mean(test_images, axis=3, keepdims=True)
+
+        # Replicate the single channel into three channels
+        train_images_rgb = np.concatenate([train_images_bw] * 3, axis=-1)
+        test_images_rgb = np.concatenate([test_images_bw] * 3, axis=-1)
+
+        # Pad images with zeros to meet the minimum size requirement
+        train_images_padded = self.pad_images(train_images_rgb)
+        test_images_padded = self.pad_images(test_images_rgb)
+
+        return train_images_padded, test_images_padded
+
+    def pad_images(self, images):
+        """
+        Pads input images to meet the minimum size requirement.
+
+        Args:
+            images (array-like): Input images.
+
+        Returns:
+            array: Padded images.
+        """
+        padded_images = np.zeros((images.shape[0], 32, 32, 3))
+        padded_images[:, 0:5, 0:8, :] = images
+        return padded_images
+
+    def transfer_learning(self):
+        """
+        Performs transfer learning using MobileNetV2.
+
+        Returns:
+            Model: The trained transfer learning model.
+        """
+        # Preprocess the data
+        train_images_padded, test_images_padded = self.preprocess_data()
+
+        # Load pre-trained MobileNetV2 model without the top (classification) layer
+        base_model = MobileNetV2(weights='imagenet', include_top=False, input_shape=(33, 33, 3))
+
+        # Add ZeroPadding2D layer to handle padding
+        model = Sequential()
+        model.add(ZeroPadding2D(padding=((0, 1), (0, 0))))  # Adjust padding to match MobileNetV2 input size
+        model.add(ZeroPadding2D(padding=((0, 0), (0, 1))))  # Adjust padding to match MobileNetV2 input size
+        model.add(base_model)
+
+        # Add a global average pooling layer
+        model.add(GlobalAveragePooling2D())
+
+        # Add a fully connected layer with softmax activation for classification
+        model.add(Dense(self.num_classes, activation='softmax'))
+
+        # Freeze the base model layers
+        for layer in base_model.layers:
+            layer.trainable = False
+
+        # Compile the model
+        model.compile(optimizer='adam', loss='sparse_categorical_crossentropy', metrics=['accuracy'])
+
+        # Define early stopping callback
+        early_stopping = EarlyStopping(monitor='val_accuracy', patience=3, restore_best_weights=True)
+
+        # Train the model with early stopping
+        model.fit(train_images_padded, self.train_labels, epochs=50, batch_size=64,
+                  validation_data=(test_images_padded, self.test_labels), callbacks=[early_stopping])
+
+        # Evaluate the model
+        test_loss, test_accuracy = model.evaluate(test_images_padded, self.test_labels, verbose=0)
+        print(f'Test accuracy: {test_accuracy}')
+
+        # Save model
+        model.save('deep_learning_model.h5')
+        return model
+
+# %% 1- Pre Processing and EDA
 
 path = 'data/heart_2020.csv'
 
@@ -1407,8 +1534,8 @@ data_preprocessing = DataPreProcessing(data_loader)
 data_visualization = DataVisualization(data_loader, ['correlation', 'box', 'barh'])
 
 # Visualization of the outliers (box plots) and all the histograms
-#data_visualization.plot_all_features()
-#data_visualization.plots(['box'])
+# data_visualization.plot_all_features()
+# data_visualization.plots(['box'])
 
 # Initialize DataCleaning class with the dataset
 data_cleaner = DataCleaning(data_loader)
@@ -1425,34 +1552,34 @@ print(data_loader.data.info)
 data_loader.data.to_csv('data/heart_2020_cleaned.csv', index=False)
 
 # Visualization of all the histograms, correlation and barh plots
-#data_visualization.plot_all_features()
-#data_visualization.plots(['correlation', 'barh'])
+# data_visualization.plot_all_features()
+# data_visualization.plots(['correlation', 'barh'])
 
 # Initialize DimensionalityReduction class with the dataset
 dr = DimensionalityReduction(data_loader)
 
 # Compute and plot PCA projection
-#dr.plot_projection(dr.compute_pca(), 'PCA Projection')
+# dr.plot_projection(dr.compute_pca(), 'PCA Projection')
 # Compute and plot UMAP projection
-#dr.plot_projection(dr.compute_umap(), 'UMAP Projection')
+# dr.plot_projection(dr.compute_umap(), 'UMAP Projection')
 
-#%% 2- Hypothesis Testing
+# %% 2- Hypothesis Testing
 
 # Initialize the HypothesisTester class with the data
 tester = HypothesisTester(data_loader)
 
 # Perform normality analysis, first by normality test and then by visual checking using a Q-Q plot
-#tester.test_normality()
-#tester.qq_plots()
+# tester.test_normality()
+# tester.qq_plots()
 
 # After the analysis of the normality test and Q-Q plots we decided the distribution of variables
 # We found from the Q-Q plots that the only normal distributed variables are BMI_with_HD and BMI_without_HD
-#tester.distribute_normality_data()
+# tester.distribute_normality_data()
 
 # Perform the hypothesis tests
-#tester.perform_tests()
+# tester.perform_tests()
 
-#%% 3- Feature Creation
+# %% 3- Feature Creation
 
 # Initialize the FeatureCreation class with the data
 feature_creator = FeatureCreation(data_loader)
@@ -1468,10 +1595,10 @@ feature_creator.create_interaction_features()
 data_loader.data.to_csv('data/heart_2020_final.csv', index=False)
 
 # Visualization of all the final histograms and correlation plot
-#data_visualization.plot_all_features()
-#data_visualization.plots(['correlation'])
+# data_visualization.plot_all_features()
+# data_visualization.plots(['correlation'])
 
-#%% 4- Model Building
+# %% 4- Model Building
 
 # Divide the data into features and target variable
 X = data_loader.data.drop(columns=[data_loader.target])
@@ -1513,5 +1640,8 @@ bagging.evaluate()
 #adaboost = AdaBoostClassifier(np.array(X_train), np.array(y_train), np.array(X_test), np.array(y_test), builder)
 #adaboost.train_adaboost()
 #adaboost.evaluate()
+
+tl_model = TransferLearningModel(data_loader.data_train_10_percent, data_loader.labels_train_10_percent, data_loader.data_test, data_loader.labels_test, num_classes=10)
+trained_model = tl_model.transfer_learning()
 
 
