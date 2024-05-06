@@ -24,6 +24,9 @@ from tensorflow.keras.callbacks import EarlyStopping
 from tensorflow.keras.models import Sequential
 from tensorflow.keras.layers import Dense
 
+#import warnings
+#warnings.filterwarnings("ignore")
+
 
 class DataLoader:
     """
@@ -1081,21 +1084,21 @@ class ModelOptimization:
         best_c = None
         best_penalty = None
         for c in C_values:
-            for penalty_seleected in penalty:
-                lr = LogisticRegression(C=c, penalty=penalty_seleected, solver='saga', multi_class='auto')
+            for penalty_selected in penalty:
+                lr = LogisticRegression(C=c, penalty=penalty_selected, solver='saga', multi_class='auto', max_iter=1000)
                 lr.fit(self.X_train, self.y_train)
                 accuracy = lr.score(self.X_val, self.y_val)
-                print(f"C = {c}, Penalty = {penalty_seleected}, Accuracy = {accuracy}")
+                print(f"C = {c}, Penalty = {penalty_selected}, Accuracy = {accuracy}")
                 if accuracy > best_accuracy:
                     best_accuracy = accuracy
                     best_c = c
-                    best_penalty = penalty_seleected
+                    best_penalty = penalty_selected
         print("Best c value:", best_c)
         print("Best penalty:", best_penalty)
         print("Best accuracy:", best_accuracy)
         return best_c, best_penalty
 
-    def optimize_decision_tree(self, max_depth_values=(None, 10, 20)):
+    def optimize_decision_tree(self, max_depth_values=(0, 10, 20)):
         """
         Optimizes the parameters for Decision Tree classifier.
 
