@@ -24,8 +24,8 @@ from tensorflow.keras.callbacks import EarlyStopping
 from tensorflow.keras.models import Sequential
 from tensorflow.keras.layers import Dense
 
-#import warnings
-#warnings.filterwarnings("ignore")
+import warnings
+warnings.filterwarnings("ignore")
 
 
 class DataLoader:
@@ -1176,6 +1176,25 @@ class CrossValidator:
         return accuracy, sensitivity, specificity
 
 
+def KNearestNeighbors(X_val, X_train, y_val, y_train, k):
+
+    correct_count = 0
+
+    for i in range(len(X_val)):
+        print(f"Processing instance {i} out of {len(X_val)}")
+
+        distances = [np.sqrt(np.sum((X_val[i] - x_train) ** 2)) for x_train in X_train]
+        nearest_indices = np.argsort(distances)[:k]
+        nearest_labels = [y_train[index] for index in nearest_indices]
+        predicted_label = max(set(nearest_labels), key=nearest_labels.count)
+
+        if predicted_label == y_val[i]:
+            correct_count += 1
+
+    accuracy = correct_count / len(X_val)
+    return accuracy
+
+
 class ModelBuilding:
 
     def __init__(self, X_train, y_train, X_test, y_test, k=5, validation_size=0.2, save_all=True):
@@ -1193,31 +1212,35 @@ class ModelBuilding:
         self.best_score = -1
         self.history = {}
 
-    def build_models(self, models_dict):
+    def build_models(self, model_name, models_dict):
 
         model_optimization = ModelOptimization(self.X_train, self.y_train, self.X_val, self.y_val)
 
+        print("\nTraining", model_name, "model")
+
         for name, model_params in models_dict.items():
 
-            print("\nTraining", name, "model")
+            if model_name != name:
+                continue
+
             model = model_params.pop('model')
             model_params_check = {}
 
-            if model == KNeighborsClassifier:
+            if model_name == "KNN":
 
                 k = model_optimization.optimize_knn(model_params['n_neighbors'])
                 model_params_check['n_neighbors'] = k
                 params = {'n_neighbors': k}
 
-            elif model == LogisticRegression:
-              
+            elif model_name == "LogisticRegression":
+
                 lr_params = model_optimization.optimize_logistic_regression(**model_params)
                 model_params_check['C'] = lr_params[0]
                 model_params_check['penalty'] = lr_params[1]
                 params = lr_params
 
-            elif model == DecisionTreeClassifier:
-              
+            elif model_name == "DecisionTree":
+
                 dt_params = model_optimization.optimize_decision_tree(**model_params)
                 model_params_check['max_depth'] = dt_params
                 params = dt_params
@@ -1232,7 +1255,7 @@ class ModelBuilding:
             self.history[str(name)] = val_score
 
             if val_score > self.best_score:
-              
+
                 print("New best model found!")
                 self.best_score = val_score
                 self.best_model = model_instance
@@ -1278,25 +1301,6 @@ class ModelBuilding:
         full_path = os.path.join(folder_path, filename)
         print("Saving model as", filename)
         joblib.dump(model, full_path)
-
-
-# def KNearestNeighbors(X_val, X_train, y_val, y_train, k):
-#
-#     correct_count = 0
-#
-#     for i in range(len(X_val)):
-#         print(f"Processing instance {i} out of {len(X_val)}")
-#
-#         distances = [np.sqrt(np.sum((X_val[i] - x_train) ** 2)) for x_train in X_train]
-#         nearest_indices = np.argsort(distances)[:k]
-#         nearest_labels = [y_train[index] for index in nearest_indices]
-#         predicted_label = max(set(nearest_labels), key=nearest_labels.count)
-#
-#         if predicted_label == y_val[i]:
-#             correct_count += 1
-#
-#     accuracy = correct_count / len(X_val)
-#     return accuracy
 
 
 class BaggingClassifier:
@@ -1391,6 +1395,124 @@ class BaggingClassifier:
         print(f"Accuracy: {self.accuracy_scores}, Sensitivity: {self.sensitivity_scores}, Specificity: {self.specificity_scores}")
         return self.accuracy_scores, self.sensitivity_scores, self.specificity_scores
 
+
+class AdaBoostClassifier:
+    """
+    Performs AdaBoost with a provided weak learner.
+    """
+    def __init__(self, X_train, y_train, X_test, y_test, builder, n_estimators=50, learning_rate=1.0, k_fold=5):
+        """
+        Initializes the AdaBoostClassifier object.
+
+        Parameters:
+            X_train (array-like): Training features.
+            y_train (array-like): Training labels.
+            X_test (array-like): Test features.
+            y_test (array-like): Test labels.
+            builder (object): Builder object with the configurations of the model.
+            n_estimators (int): Number of weak learners. Default is 50.
+            learning_rate (float): Learning rate shrinks the contribution of each weak learner. Default is 1.0.
+            k_fold (int): Number of folds for cross-validation. Default is 5.
+        """
+        self.n_estimators = n_estimators
+        self.learning_rate = learning_rate
+        self.k_fold = k_fold
+        self.models = []
+        self.X_train, self.y_train = X_train, y_train
+        self.X_test = X_test
+        self.y_test = y_test
+        self.accuracy_scores = []
+        self.sensitivity_scores = []
+        self.specificity_scores = []
+        self.builder = builder
+
+    def train_adaboost(self):
+        """
+        Trains the AdaBoost ensemble on the training data with k fold cross-validation.
+        """
+        kfold = KFold(n_splits=self.k_fold, shuffle=True)
+        for train_index, val_index in kfold.split(self.X_train):
+            # Initialize weights
+            w = np.ones(len(train_index)) / len(train_index)
+
+            models = []
+            for level in range(self.n_estimators):
+                print("Level ", level, " of ", self.n_estimators-1)
+                # Train base model with weighted samples
+                base_model = LogisticRegression(C=self.builder.best_model_params_checked['C'],
+                                                penalty=self.builder.best_model_params_checked['penalty'])
+                base_model.fit(self.X_train[train_index], self.y_train[train_index], sample_weight=w)
+
+                print("Examining model")
+                # Compute error
+                y_pred = base_model.predict(self.X_train[train_index])
+                err = np.sum(w * (y_pred != self.y_train[train_index])) / np.sum(w)
+
+                print("Updating Adaboost model")
+                # Compute alpha
+                alpha = self.learning_rate * np.log((1 - err) / err)
+
+                # Update weights
+                w *= np.exp(alpha * (y_pred != self.y_train[train_index]))
+
+                models.append((base_model, alpha))
+
+            self.models.append(models)
+
+            # Compute predictions for validation set
+            y_pred = self.predict(val_index)
+
+            # Evaluate performance
+            self.accuracy_scores.append(accuracy_score(self.y_train[val_index], y_pred))
+            print("Accuracy:", self.accuracy_scores[-1])
+
+        self.avg_accuracy = sum(self.accuracy_scores) / len(self.accuracy_scores)
+
+        return self.avg_accuracy
+
+    def predict(self, index):
+        """
+        Predicts class labels for input data.
+
+        Parameters:
+            index (array-like): Indices of data to predict.
+
+        Returns:
+            array-like: Predicted class labels.
+        """
+        num_classes = len(np.unique(self.y_train))
+        predictions = np.zeros((len(index), num_classes))
+        for model, alpha in self.models[-1]:
+            y_pred = model.predict(self.X_train[index])
+            # Adjust the size of predictions array to match the expected size
+            temp_predictions = np.zeros((len(index), num_classes))
+            # Iterate over each sample and increment the corresponding class prediction
+            for i, pred in enumerate(y_pred):
+                temp_predictions[i, int(pred)] += alpha
+            predictions += temp_predictions
+
+        final_predictions = np.argmax(predictions, axis=1)
+        return final_predictions
+
+    def evaluate(self):
+        """
+        Evaluates the AdaBoost ensemble on test data.
+
+        Returns:
+            float: Accuracy score.
+        """
+        num_classes = len(np.unique(self.y_train))
+        predictions = np.zeros((len(self.y_test), num_classes))
+        for model, alpha in self.models[-1]:
+            y_pred = model.predict(self.X_test)
+            temp_predictions = np.zeros((len(self.y_test), num_classes))
+            for i, pred in enumerate(y_pred):
+                temp_predictions[i, int(pred)] += alpha
+            predictions += temp_predictions
+        final_predictions = np.argmax(predictions, axis=1)
+        self.accuracy_scores = accuracy_score(self.y_test, final_predictions)
+        print(f"Accuracy: {self.accuracy_scores}")
+        return self.accuracy_scores
 
 #%% 1- Pre Processing and EDA
 
@@ -1490,8 +1612,11 @@ models_dict = {
 # Create an instance of ModelBuilder
 builder = ModelBuilding(np.array(X_train), np.array(y_train), np.array(X_test), np.array(y_test))
 
-# Build the models
-builder.build_models(models_dict)
+# Build KNN
+builder.build_models("KNN", models_dict)
+builder.build_models("LogisticRegression", models_dict)
+builder.build_models("DecisionTree", models_dict)
+
 builder.evaluate_best_model()
 
 # Serialize the builder object
@@ -1510,8 +1635,8 @@ bagging.examine_bagging()
 bagging.evaluate()
 
 # Perform AdaBoost on the best model
-#adaboost = AdaBoostClassifier(np.array(X_train), np.array(y_train), np.array(X_test), np.array(y_test), builder)
-#adaboost.train_adaboost()
-#adaboost.evaluate()
+adaboost = AdaBoostClassifier(np.array(X_train), np.array(y_train), np.array(X_test), np.array(y_test), builder)
+adaboost.train_adaboost()
+adaboost.evaluate()
 
 
