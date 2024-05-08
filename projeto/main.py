@@ -10,6 +10,8 @@ from sklearn.inspection import permutation_importance
 from sklearn.mixture import GaussianMixture
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.linear_model import LogisticRegression
+from sklearn.neural_network import MLPClassifier
+from sklearn.svm import SVC
 from sklearn.tree import DecisionTreeClassifier
 from sklearn.preprocessing import StandardScaler
 from sklearn.decomposition import PCA
@@ -21,6 +23,7 @@ from scipy.stats import ttest_ind, probplot, shapiro
 import statsmodels.stats.api as sms
 from pycm import ConfusionMatrix
 import joblib
+from joblib import Parallel, delayed
 import os
 import pickle
 #from keras.src.applications.mobilenet_v2 import MobileNetV2
@@ -28,8 +31,12 @@ from tensorflow.keras.applications import MobileNetV2
 #from keras.src.callbacks import EarlyStopping
 from tensorflow.keras.callbacks import EarlyStopping
 #from keras.src.layers import GlobalAveragePooling2D
-from tensorflow.keras.layers import Dense, ZeroPadding2D, GlobalAveragePooling2D
+from tensorflow.keras.layers import Dense, ZeroPadding2D, GlobalAveragePooling2D, Embedding, Conv1D, MaxPooling1D, Flatten, LSTM
 from tensorflow.keras.models import Sequential
+from tensorflow.keras.utils import to_categorical
+from tensorflow.keras.datasets import reuters
+from tensorflow.keras.preprocessing.sequence import pad_sequences
+import random
 
 import warnings
 warnings.filterwarnings("ignore")
@@ -1070,6 +1077,7 @@ class ModelOptimization:
 
         for k in k_values:
 
+            #knn = KNearestNeighbors(self.X_val, self.X_train, self.y_val, self.y_train, k)
             knn = KNeighborsClassifier(n_neighbors=k)
             knn.fit(self.X_train, self.y_train)
             accuracy = knn.score(self.X_val, self.y_val)
@@ -1083,7 +1091,7 @@ class ModelOptimization:
         print("Best accuracy:", best_accuracy)
         return best_k
 
-    def optimize_logistic_regression(self, C_values=(0.1, 1.0, 10.0), penalty=('l1', 'l2')):
+    def optimize_logistic_regression(self, C_values=(0.01, 0.1, 1.0, 10.0), penalty=('l1', 'l2')):
         """
         Optimizes the parameters for Logistic Regression classifier.
 
@@ -1097,22 +1105,27 @@ class ModelOptimization:
         best_accuracy = -1
         best_c = None
         best_penalty = None
+
         for c in C_values:
             for penalty_selected in penalty:
+
                 lr = LogisticRegression(C=c, penalty=penalty_selected, solver='saga', multi_class='auto', max_iter=1000)
                 lr.fit(self.X_train, self.y_train)
                 accuracy = lr.score(self.X_val, self.y_val)
+
                 print(f"C = {c}, Penalty = {penalty_selected}, Accuracy = {accuracy}")
+
                 if accuracy > best_accuracy:
                     best_accuracy = accuracy
                     best_c = c
                     best_penalty = penalty_selected
+
         print("Best c value:", best_c)
         print("Best penalty:", best_penalty)
         print("Best accuracy:", best_accuracy)
         return best_c, best_penalty
 
-    def optimize_decision_tree(self, max_depth_values=(None, 10, 20)):
+    def optimize_decision_tree(self, max_depth_values=(None, 5, 10, 20)):
         """
         Optimizes the parameters for Decision Tree classifier.
 
@@ -1124,17 +1137,88 @@ class ModelOptimization:
         """
         best_accuracy = -1
         best_max_depth = None
+
         for max_depth in max_depth_values:
+
             dt = DecisionTreeClassifier(max_depth=max_depth)
             dt.fit(self.X_train, self.y_train)
             accuracy = dt.score(self.X_val, self.y_val)
+
             print(f"Max depth = {max_depth}, Accuracy = {accuracy}")
+
             if accuracy > best_accuracy:
                 best_accuracy = accuracy
                 best_max_depth = max_depth
+
         print("Best max depth value:", best_max_depth)
         print("Best accuracy:", best_accuracy)
         return best_max_depth
+
+    def optimize_mlp(self, population_size=20, max_generations=50, layer_range=(1, 100), activation=('logistic', 'tanh')):
+        """
+        Optimizes the parameters for Multi-layer Perceptron (MLP) classifier.
+
+        Parameters:
+            population_size (int): Size of the population for optimization. Default is 20.
+            max_generations (int): Maximum number of generations for optimization. Default is 50.
+            layer_range (tuple): Range of neurons in hidden layers. Default is (1, 100).
+            activation (tuple): Activation functions to try. Default is ('logistic', 'tanh').
+
+        Returns:
+            tuple: Best parameters for MLP (number of neurons, activation function).
+        """
+        # Initialize the population
+        population = []
+
+        for _ in range(population_size):
+
+            neurons = random.randint(*layer_range)
+            activation_selected = random.choice(activation)
+            population.append((neurons, activation_selected))
+
+        # Random evolutionary search
+        for generation in range(max_generations):
+
+            print(f"Generation {generation + 1}/{max_generations}")
+            new_population = []
+            for i, (neurons, activation_selected) in enumerate(population):
+
+                # Skip the first iteration from generation 1 onwards since it is the best elements foun on the previous iteration
+                if generation != 0 and i == 0:
+                    new_population.append((best_params, best_accuracy))
+                    continue
+
+                print("Generation ", generation, " element ", i)
+                mlp = MLPClassifier(hidden_layer_sizes=(neurons,), activation=activation_selected, early_stopping=True)
+                mlp.fit(self.X_train, self.y_train)
+                accuracy = mlp.score(self.X_val, self.y_val)
+                new_population.append(((neurons, activation_selected), accuracy))
+                print(f"Neurons: {neurons}, activation: {activation_selected}, Accuracy: {accuracy}")
+
+            new_population.sort(key=lambda x: x[1], reverse=True)
+            # Keep only the best element (concept of elitism in genetic algorithm)
+            best_params, best_accuracy = new_population[0]
+            population = [best_params]
+
+            # Use the parameters of the best individual to bias the generation of new individuals
+            best_neurons, best_activation = best_params
+
+            # Break when only 2 individuals are left
+            if population_size <= 2:
+                break
+            population_size -= 1
+
+            # Generate the new population
+            for _ in range(1, population_size):
+                # Randomly generate neurons with a bias towards the best_neurons
+                neurons = random.randint(np.ceil(best_neurons - 20) + 1, best_neurons + 20)
+                # Randomly select activation function
+                activation_selected = random.choice(activation)
+                population.append((neurons, activation_selected))
+
+        print("Best MLP parameters:", best_params)
+        print("Best accuracy:", best_accuracy)
+        return best_params
 
 
 class CrossValidator:
@@ -1187,98 +1271,90 @@ class CrossValidator:
         return accuracy, sensitivity, specificity
 
 
-def KNearestNeighbors(X_val, X_train, y_val, y_train, k):
-
-    correct_count = 0
-
-    for i in range(len(X_val)):
-        print(f"Processing instance {i} out of {len(X_val)}")
+def KNearestNeighbors(X_val, X_train, y_val, y_train, k, n_jobs=-1):
+    def process_instance(i):
+        #print(f"Processing instance {i} out of {len(X_val)}")
 
         distances = [np.sqrt(np.sum((X_val[i] - x_train) ** 2)) for x_train in X_train]
         nearest_indices = np.argsort(distances)[:k]
         nearest_labels = [y_train[index] for index in nearest_indices]
         predicted_label = max(set(nearest_labels), key=nearest_labels.count)
 
-        if predicted_label == y_val[i]:
-            correct_count += 1
+        return predicted_label == y_val[i]
 
-    accuracy = correct_count / len(X_val)
+    correct_counts = Parallel(n_jobs=n_jobs)(delayed(process_instance)(i) for i in range(len(X_val)))
+    accuracy = sum(correct_counts) / len(X_val)
     return accuracy
 
 
 class ModelBuilding:
-
-    def __init__(self, X_train, y_train, X_test, y_test, k=5, validation_size=0.2, save_all=True):
-
-        self.X_train_complete = X_train
-        self.y_train_complete = y_train
-        self.X_train, self.X_val, self.y_train, self.y_val = train_test_split(X_train, y_train,
-                                                                              test_size=validation_size)
+    def __init__(self, X_train, y_train, X_test, y_test, X_val, y_val, k=5, save_all=True):
+        self.X_train = X_train
+        self.y_train = y_train
         self.X_test = X_test
         self.y_test = y_test
+        self.X_val = X_val
+        self.y_val = y_val
         self.k = k
         self.save_all = save_all
         self.best_model = None
         self.best_model_name = None
         self.best_params = None
         self.best_score = -1
+        self.best_model_changed = False  # Flag to track if the best model changed
         self.history = {}
 
     def build_models(self, model_name, models_dict):
-
         model_optimization = ModelOptimization(self.X_train, self.y_train, self.X_val, self.y_val)
-
         print("\nTraining", model_name, "model")
-
         for name, model_params in models_dict.items():
-
             if model_name != name:
                 continue
-
             model = model_params.pop('model')
             model_params_check = {}
 
             if model_name == "KNN":
-
                 k = model_optimization.optimize_knn(model_params['n_neighbors'])
                 model_params_check['n_neighbors'] = k
                 params = {'n_neighbors': k}
-
             elif model_name == "LogisticRegression":
-
                 lr_params = model_optimization.optimize_logistic_regression(**model_params)
                 model_params_check['C'] = lr_params[0]
                 model_params_check['penalty'] = lr_params[1]
                 params = lr_params
-
             elif model_name == "DecisionTree":
-
                 dt_params = model_optimization.optimize_decision_tree(**model_params)
                 model_params_check['max_depth'] = dt_params
                 params = dt_params
-
+            elif model_name == "MLP":
+                mlp_params = model_optimization.optimize_mlp(**model_params)
+                model_params_check['hidden_layer_sizes'] = (mlp_params[0],)
+                model_params_check['activation'] = mlp_params[1]
+                params = mlp_params
             else:
                 raise ValueError("Model type is not supported.")
 
-            # Check the performance of the optimized model parameters on the validation data
             model_instance = model(**model_params_check)
             model_instance.fit(self.X_train, self.y_train)
             val_score = model_instance.score(self.X_val, self.y_val)
             self.history[str(name)] = val_score
 
             if val_score > self.best_score:
-                print("New best model found!")
+                print("\nNew best model found!")
                 self.best_score = val_score
                 self.best_model = model_instance
                 self.best_model_name = name
                 self.best_params = params
                 self.best_model_checked = model
                 self.best_model_params_checked = model_params_check
+                self.best_model_changed = True  # Update flag when a new best model is found
+            else:
+                self.best_model_changed = False  # Reset flag if the best model didn't change
 
             if self.save_all:
                 self.save_model(model_instance, name)
 
-        print("Optimization finished, history:\n")
+        print("\nOptimization finished, history:\n")
         print("Model name\t\tAccuracy")  # Print header
         for model, accuracy in self.history.items():  # Print table rows
             print(f"{model}\t\t{accuracy}")
@@ -1289,14 +1365,15 @@ class ModelBuilding:
         if not self.save_all:
             self.save_model(self.best_model, self.best_model_name)
 
-        # Evaluate best found model using CrossValidator
-        self.kf_cv = CrossValidator(k=self.k)
-        self.avg_accuracy, self.avg_sensitivity, self.avg_specificity = self.kf_cv.cross_validate(
-            self.best_model_checked(**self.best_model_params_checked), self.X_train_complete, self.y_train_complete)
+        # Perform cross-validation only if the best model changed
+        if self.best_model_changed:
+            self.kf_cv = CrossValidator(k=self.k)
+            self.avg_accuracy, self.avg_sensitivity, self.avg_specificity = self.kf_cv.cross_validate(
+                self.best_model_checked(**self.best_model_params_checked), self.X_train, self.y_train)
 
-        print("Average accuracy during cross-validation:", self.avg_accuracy)
-        print("Average sensitivity during cross-validation:", self.avg_sensitivity)
-        print("Average specificity during cross-validation:", self.avg_specificity)
+            print("Average accuracy during cross-validation:", self.avg_accuracy)
+            print("Average sensitivity during cross-validation:", self.avg_sensitivity)
+            print(f"Average specificity during cross-validation: {self.avg_specificity}\n")
 
         return self.history, self.avg_accuracy, self.avg_sensitivity, self.avg_specificity
 
@@ -1412,7 +1489,7 @@ class AdaBoostClassifier:
     """
     Performs AdaBoost with a provided weak learner.
     """
-    def __init__(self, X_train, y_train, X_test, y_test, builder, n_estimators=50, learning_rate=1.0, k_fold=5):
+    def __init__(self, best_model, X_train, y_train, X_test, y_test, builder, n_estimators=50, learning_rate=1.0, k_fold=5):
         """
         Initializes the AdaBoostClassifier object.
 
@@ -1437,6 +1514,7 @@ class AdaBoostClassifier:
         self.sensitivity_scores = []
         self.specificity_scores = []
         self.builder = builder
+        self.best_model = best_model
 
     def train_adaboost(self):
         """
@@ -1451,8 +1529,29 @@ class AdaBoostClassifier:
             for level in range(self.n_estimators):
                 print("Level ", level, " of ", self.n_estimators-1)
                 # Train base model with weighted samples
-                base_model = LogisticRegression(C=self.builder.best_model_params_checked['C'],
-                                                penalty=self.builder.best_model_params_checked['penalty'])
+
+                base_model = None
+
+                if (self.best_model == 'KNN'):
+
+                    base_model = KNeighborsClassifier(n_neighbors=self.builder.best_model_params_checked['n_neighbors'])
+
+                elif (self.best_model == 'LogisticRegression'):
+
+                    base_model = LogisticRegression(C=self.builder.best_model_params_checked['C'],
+                                                    penalty=self.builder.best_model_params_checked['penalty'])
+
+                elif (self.best_model == 'DecisionTree'):
+
+                    base_model = DecisionTreeClassifier(max_depth=self.builder.best_model_params_checked['max_depth'])
+
+                elif (self.best_model == 'MLP'):
+
+                    base_model = MLPClassifier(hidden_layer_sizes=self.builder.best_model_params_checked['hidden_layer_sizes'],
+                                            activation=self.builder.best_model_params_checked['activation'], early_stopping=True)
+                else:
+                    raise ValueError("Best model not found.")
+
                 base_model.fit(self.X_train[train_index], self.y_train[train_index], sample_weight=w)
 
                 print("Examining model")
@@ -1523,133 +1622,69 @@ class AdaBoostClassifier:
             predictions += temp_predictions
         final_predictions = np.argmax(predictions, axis=1)
         self.accuracy_scores = accuracy_score(self.y_test, final_predictions)
-        print(f"Accuracy: {self.accuracy_scores}")
+        print(f"\nEvaluated Accuracy: {self.accuracy_scores}")
         return self.accuracy_scores
 
 
-class TransferLearningModel:
-    """
-    A class for transfer learning with pre-trained models.
+class CNN:
+    def __init__(self, X_train, y_train, X_test, y_test, X_val, y_val, input_shape, num_classes, epochs=10, batch_size=32):
 
-    Attributes:
-        train_data (DataFrame): The training data.
-        train_labels (array-like): The training labels.
-        test_data (DataFrame): The test data.
-        test_labels (array-like): The test labels.
-        num_classes (int): The number of classes in the classification task.
-
-    Methods:
-        preprocess_data(): Preprocesses the input data for transfer learning.
-        pad_images(images): Pads input images to meet the minimum size requirement.
-        transfer_learning(): Performs transfer learning using MobileNetV2.
-    """
-
-    def __init__(self, train_data, train_labels, test_data, test_labels, num_classes):
-        """
-        Initializes the TransferLearningModel with input data and parameters.
-
-        Args:
-            train_data (DataFrame): The training data.
-            train_labels (array-like): The training labels.
-            test_data (DataFrame): The test data.
-            test_labels (array-like): The test labels.
-            num_classes (int): The number of classes in the classification task.
-        """
-        self.train_data = train_data
-        self.train_labels = train_labels
-        self.test_data = test_data
-        self.test_labels = test_labels
+        self.X_train = X_train
+        self.y_train = y_train
+        self.X_test = X_test
+        self.y_test = y_test
+        self.X_val = X_val
+        self.y_val = y_val
+        self.input_shape = input_shape
         self.num_classes = num_classes
+        self.epochs = epochs
+        self.batch_size = batch_size
+        self.model = self.build_model()
 
-    def preprocess_data(self):
-        """
-        Preprocesses the input data for transfer learning.
+    def build_model(self):
 
-        Returns:
-            tuple: Tuple containing preprocessed training and test images.
-        """
-        # Convert DataFrame to NumPy array
-        train_data_array = self.train_data.values
-        test_data_array = self.test_data.values
+        max_words = 10000
+        maxlen = 100
+        (self.X_train, self.y_train), (self.X_test, self.y_test) = reuters.load_data(num_words=max_words, maxlen=maxlen)
 
-        # Reshape the data to (num_samples, height, width, channels)
-        train_images = train_data_array.reshape(-1, 5, 8, 1)
-        test_images = test_data_array.reshape(-1, 5, 8, 1)
+        # Pad sequences to make them of equal length
+        self.X_train = pad_sequences(self.X_train, maxlen=maxlen)
+        self.X_test = pad_sequences(self.X_test, maxlen=maxlen)
 
-        # Convert the images to black and white (grayscale)
-        train_images_bw = np.mean(train_images, axis=3, keepdims=True)
-        test_images_bw = np.mean(test_images, axis=3, keepdims=True)
+        model = Sequential([
+            Embedding(input_dim=max_words, output_dim=50, input_length=maxlen),
+            Conv1D(filters=32, kernel_size=3, activation='relu'),
+            MaxPooling1D(pool_size=2),
+            Flatten(),
+            Dense(64, activation='relu'),
+            Dense(1, activation='sigmoid')
+        ])
 
-        # Replicate the single channel into three channels
-        train_images_rgb = np.concatenate([train_images_bw] * 3, axis=-1)
-        test_images_rgb = np.concatenate([test_images_bw] * 3, axis=-1)
+        model.compile(optimizer='adam',
+                      loss='binary_crossentropy',
+                      metrics=['accuracy'])
 
-        # Pad images with zeros to meet the minimum size requirement
-        train_images_padded = self.pad_images(train_images_rgb)
-        test_images_padded = self.pad_images(test_images_rgb)
+        self.early_stopping = EarlyStopping(monitor='val_loss', patience=3, restore_best_weights=True)
 
-        return train_images_padded, test_images_padded
-
-    def pad_images(self, images):
-        """
-        Pads input images to meet the minimum size requirement.
-
-        Args:
-            images (array-like): Input images.
-
-        Returns:
-            array: Padded images.
-        """
-        padded_images = np.zeros((images.shape[0], 32, 32, 3))
-        padded_images[:, 0:5, 0:8, :] = images
-        return padded_images
-
-    def transfer_learning(self):
-        """
-        Performs transfer learning using MobileNetV2.
-
-        Returns:
-            Model: The trained transfer learning model.
-        """
-        # Preprocess the data
-        train_images_padded, test_images_padded = self.preprocess_data()
-
-        # Load pre-trained MobileNetV2 model without the top (classification) layer
-        base_model = MobileNetV2(weights='imagenet', include_top=False, input_shape=(33, 33, 3))
-
-        # Add ZeroPadding2D layer to handle padding
-        model = Sequential()
-        model.add(ZeroPadding2D(padding=((0, 1), (0, 0))))  # Adjust padding to match MobileNetV2 input size
-        model.add(ZeroPadding2D(padding=((0, 0), (0, 1))))  # Adjust padding to match MobileNetV2 input size
-        model.add(base_model)
-
-        # Add a global average pooling layer
-        model.add(GlobalAveragePooling2D())
-
-        # Add a fully connected layer with softmax activation for classification
-        model.add(Dense(self.num_classes, activation='softmax'))
-
-        # Freeze the base model layers
-        for layer in base_model.layers:
-            layer.trainable = False
-
-        # Compile the model
-        model.compile(optimizer='adam', loss='sparse_categorical_crossentropy', metrics=['accuracy'])
-
-        # Define early stopping callback
-        early_stopping = EarlyStopping(monitor='val_accuracy', patience=3, restore_best_weights=True)
-
-        # Train the model with early stopping
-        model.fit(train_images_padded, self.train_labels, epochs=50, batch_size=64,
-                  validation_data=(test_images_padded, self.test_labels), callbacks=[early_stopping])
-
-        # Evaluate the model
-        test_loss, test_accuracy = model.evaluate(test_images_padded, self.test_labels, verbose=0)
-        print(f'Test accuracy: {test_accuracy}')
-
-        # Save model
-        model.save('deep_learning_model.h5')
         return model
+
+    def train(self):
+
+        # Ensure target labels are one-dimensional
+        y_train = self.y_train.squeeze()
+        y_val = self.y_val.squeeze()
+
+        history = self.model.fit(self.X_train, y_train, batch_size=self.batch_size, epochs=self.epochs,
+                                 verbose=1, validation_data=(self.X_val, y_val), callbacks=[self.early_stopping])
+
+        return history
+
+    def evaluate(self):
+        # Ensure target labels are one-dimensional
+        y_test = self.y_test.squeeze()
+
+        scores = self.model.evaluate(self.X_test, y_test, verbose=0)
+        return scores
 
 
 class ClusteringModel:
@@ -1836,19 +1871,24 @@ y = data_loader.data[data_loader.target]
 # Split the data into training and testing sets
 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
 
+# Split the training set into training and validation sets
+X_train, X_val, y_train, y_val = train_test_split(X_train, y_train, test_size=0.2, random_state=42)
+
 # Define the model dictionary for the optimization
 models_dict = {
     "KNN": {"model": KNeighborsClassifier, "n_neighbors": (3, 5, 7)},
-    "LogisticRegression": {"model": LogisticRegression, "C_values": (0.1, 1.0, 10.0), "penalty": (None, 'l2')},
-    "DecisionTree": {"model": DecisionTreeClassifier, "max_depth_values": (None, 10, 20)}
+    "LogisticRegression": {"model": LogisticRegression, "C_values": (0.01, 0.1, 1.0, 10.0), "penalty": (None, 'l2')},
+    "DecisionTree": {"model": DecisionTreeClassifier, "max_depth_values": (None, 5, 10, 20)},
+    "MLP": {"model": MLPClassifier, "population_size": 5, "max_generations": 20, "layer_range": (150, 300),
+            "activation": ("tanh", "logistic", "relu")}
 }
 
 # Create an instance of ModelBuilder
-builder = ModelBuilding(np.array(X_train), np.array(y_train), np.array(X_test), np.array(y_test))
+builder = ModelBuilding(np.array(X_train), np.array(y_train), np.array(X_test), np.array(y_test), np.array(X_val), np.array(y_val))
 
-# Build KNN
-builder.build_models("KNN", models_dict)
-builder.build_models("LogisticRegression", models_dict)
+#builder.build_models("MLP", models_dict)
+#builder.build_models("KNN", models_dict)
+#builder.build_models("LogisticRegression", models_dict)
 builder.build_models("DecisionTree", models_dict)
 
 builder.evaluate_best_model()
@@ -1867,14 +1907,49 @@ print("Best model parameters:", builder.best_model_params_checked)
 #                             np.array(y_train), np.array(X_test), np.array(y_test))
 # bagging.examine_bagging()
 # bagging.evaluate()
+
+# best_model_name = None
+#
+# if (builder.best_model_checked == KNeighborsClassifier):
+#     best_model_name = 'KNN'
+# elif (builder.best_model_checked == LogisticRegression):
+#     best_model_name = 'LogisticRegression'
+# elif (builder.best_model_checked == DecisionTreeClassifier):
+#     best_model_name = 'DecisionTree'
+# elif (builder.best_model_checked == MLPClassifier):
+#     best_model_name = 'MLP'
 #
 # # Perform AdaBoost on the best model
-# adaboost = AdaBoostClassifier(np.array(X_train), np.array(y_train), np.array(X_test), np.array(y_test), builder)
+# adaboost = AdaBoostClassifier(best_model_name, np.array(X_train), np.array(y_train), np.array(X_test), np.array(y_test), builder)
 # adaboost.train_adaboost()
 # adaboost.evaluate()
 
-tl_model = TransferLearningModel(X_train, y_train, X_test, y_test, num_classes=10)
-trained_model = tl_model.transfer_learning()
+#CNN
+# Define the input shape and number of classes
+input_shape = (X_train.shape[1], 1)
+num_classes = len(np.unique(y_train))
 
-clustering_model = ClusteringModel(X_train, X_test, 10)
-clustering_model.perform_clustering()
+# Reshape the data for CNN
+X_train_cnn = X_train.values.reshape(X_train.shape[0], X_train.shape[1], 1)
+X_test_cnn = X_test.values.reshape(X_test.shape[0], X_test.shape[1], 1)
+
+# Print the shapes of X_train_cnn and X_test_cnn
+print("Shape of X_train_cnn:", X_train_cnn.shape)
+print("Shape of X_test_cnn:", X_test_cnn.shape)
+
+# Create an instance of CNN
+cnn = CNN(X_train_cnn, y_train, X_test_cnn, y_test, X_val, y_val, input_shape, num_classes)
+
+# Print the summary of the CNN model
+cnn.model.summary()
+
+# Train the CNN model
+history = cnn.train()
+
+# Evaluate the CNN model
+scores = cnn.evaluate()
+print("CNN Loss:", scores[0])
+print("CNN Accuracy:", scores[1])
+
+# clustering_model = ClusteringModel(X_train, X_test, 10)
+# clustering_model.perform_clustering()
