@@ -8,7 +8,7 @@ from sklearn.cluster import KMeans, OPTICS
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.inspection import permutation_importance
 from sklearn.mixture import GaussianMixture
-from sklearn.neighbors import KNeighborsClassifier
+from sklearn.neighbors import KNeighborsClassifier, NearestNeighbors
 from sklearn.linear_model import LogisticRegression
 from sklearn.neural_network import MLPClassifier
 from sklearn.svm import SVC
@@ -1062,6 +1062,23 @@ class FeatureCreation:
 
 
 class ModelOptimization:
+    """
+    Class for optimizing the parameters of different classifiers.
+
+    Parameters:
+        - X_train (array-like): Training data.
+        - y_train (array-like): Training labels.
+        - X_val (array-like): Validation data.
+        - y_val (array-like): Validation labels.
+
+    Attributes:
+
+    Methods:
+        optimize_knn: Optimizes the parameters for K-Nearest Neighbors classifier.
+        optimize_logistic_regression: Optimizes the parameters for Logistic Regression classifier.
+        optimize_decision_tree: Optimizes the parameters for Decision Tree classifier.
+        optimize_mlp: Optimizes the parameters for Multi-layer Perceptron (MLP) classifier.
+    """
 
     def __init__(self, X_train, y_train, X_val, y_val):
 
@@ -1071,14 +1088,23 @@ class ModelOptimization:
         self.y_val = y_val
 
     def optimize_knn(self, k_values):
+        """
+        Optimizes the parameters for K-Nearest Neighbors classifier.
+
+        Parameters:
+            k_values (list): List of k values to try.
+
+        Returns:
+            int: Best k value.
+        """
 
         best_k = None
         best_accuracy = -1
 
         for k in k_values:
 
-            #knn = KNearestNeighbors(self.X_val, self.X_train, self.y_val, self.y_train, k)
-            knn = KNeighborsClassifier(n_neighbors=k)
+            knn = KNearestNeighbors(k)
+            #knn = KNeighborsClassifier(n_neighbors=k)
             knn.fit(self.X_train, self.y_train)
             accuracy = knn.score(self.X_val, self.y_val)
             print(f"k = {k}, Accuracy = {accuracy}")
@@ -1096,8 +1122,8 @@ class ModelOptimization:
         Optimizes the parameters for Logistic Regression classifier.
 
         Parameters:
-            C_values (tuple): Values to try for regularization parameter C. Default is (0.1, 1.0, 10.0).
-            penalty (tuple): Regularization penalty to try. Default is ('l1', 'l2').
+            C_values (tuple): Values to try for regularization parameter C. Default is (0.01, 0.1, 1.0, 10.0).
+            penalty (tuple): Penalty values to try. Default is ('l1', 'l2').
 
         Returns:
             tuple: Best parameters for Logistic Regression (C, penalty).
@@ -1130,10 +1156,10 @@ class ModelOptimization:
         Optimizes the parameters for Decision Tree classifier.
 
         Parameters:
-            max_depth_values (tuple): Values to try for maximum depth. Default is (None, 10, 20).
+            max_depth_values (tuple): Values to try for max depth. Default is (None, 5, 10, 20).
 
         Returns:
-            tuple: Best parameters for Decision Tree (max depth).
+            int: Best max depth value.
         """
         best_accuracy = -1
         best_max_depth = None
@@ -1159,13 +1185,13 @@ class ModelOptimization:
         Optimizes the parameters for Multi-layer Perceptron (MLP) classifier.
 
         Parameters:
-            population_size (int): Size of the population for optimization. Default is 20.
-            max_generations (int): Maximum number of generations for optimization. Default is 50.
-            layer_range (tuple): Range of neurons in hidden layers. Default is (1, 100).
+            population_size (int): Number of individuals in the population. Default is 20.
+            max_generations (int): Maximum number of generations. Default is 50.
+            layer_range (tuple): Range of values to try for the number of neurons in the hidden layer. Default is (1, 100).
             activation (tuple): Activation functions to try. Default is ('logistic', 'tanh').
 
         Returns:
-            tuple: Best parameters for MLP (number of neurons, activation function).
+            tuple: Best parameters for MLP (neurons, activation).
         """
         # Initialize the population
         population = []
@@ -1222,8 +1248,27 @@ class ModelOptimization:
 
 
 class CrossValidator:
+    """
+    Class for performing k-fold cross-validation on machine learning models.
+
+    Parameters:
+        k (int): Number of folds for cross-validation. Default is 5.
+
+    Attributes:
+        k (int): Number of folds for cross-validation.
+        kf (object): KFold object for splitting the data.
+        cm (object): ConfusionMatrix object for calculating confusion matrix.
+        accuracy_scores (list): List of accuracy scores for each fold.
+        sensitivity_scores (list): List of sensitivity scores for each fold.
+        specificity_scores (list): List of specificity scores for each fold.
+
+    Methods:
+        cross_validate: Performs k-fold cross-validation on the model.
+        evaluate_on_test_set: Evaluates the trained model on the test set.
+    """
 
     def __init__(self, k=5):
+
         self.k = k
         self.kf = KFold(n_splits=k, shuffle=True)
         self.cm = None
@@ -1232,6 +1277,18 @@ class CrossValidator:
         self.specificity_scores = []
 
     def cross_validate(self, model, X, y):
+        """
+        Performs k-fold cross-validation on the model.
+
+        Parameters:
+            model: Machine learning model.
+            X (array-like): Features.
+            y (array-like): Labels.
+
+        Returns:
+            tuple: Average accuracy, sensitivity, and specificity scores.
+        """
+
         for train_index, val_index in self.kf.split(X):
             X_train, X_val = X[train_index], X[val_index]
             y_train, y_val = y[train_index], y[val_index]
@@ -1271,24 +1328,97 @@ class CrossValidator:
         return accuracy, sensitivity, specificity
 
 
-def KNearestNeighbors(X_val, X_train, y_val, y_train, k, n_jobs=-1):
-    def process_instance(i):
-        #print(f"Processing instance {i} out of {len(X_val)}")
+class KNearestNeighbors:
+    def __init__(self, k, radius=100):
+        self.k = k
+        self.radius = radius
+        self.nbrs = None
+        self.y_train = None
 
-        distances = [np.sqrt(np.sum((X_val[i] - x_train) ** 2)) for x_train in X_train]
-        nearest_indices = np.argsort(distances)[:k]
-        nearest_labels = [y_train[index] for index in nearest_indices]
-        predicted_label = max(set(nearest_labels), key=nearest_labels.count)
+    def fit(self, X_train, y_train):
+        # Initialize NearestNeighbors object with algorithm='ball_tree' for efficient nearest neighbor search
+        self.nbrs = NearestNeighbors(n_neighbors=self.k, algorithm='ball_tree').fit(X_train)
+        self.y_train = y_train
 
-        return predicted_label == y_val[i]
+    def score(self, X_val, y_val):
+        # Perform radius search for each validation data point
+        _, indices = self.nbrs.radius_neighbors(X_val, self.radius)
 
-    correct_counts = Parallel(n_jobs=n_jobs)(delayed(process_instance)(i) for i in range(len(X_val)))
-    accuracy = sum(correct_counts) / len(X_val)
-    return accuracy
+        correct_counts = 0
+        total_counts = len(X_val)
+
+        # Iterate through each validation data point and count correct predictions
+        for i in range(total_counts):
+            neighbor_labels = self.y_train[indices[i]]  # Get labels of neighbors within the radius
+            if len(neighbor_labels) >= self.k:  # Check if the number of neighbors is at least k
+                predicted_label = np.bincount(neighbor_labels).argmax()  # Predict label based on majority vote
+                if predicted_label == y_val[i]:  # Check if prediction matches the true label
+                    correct_counts += 1
+            else:
+                raise ValueError(f"Number of neighbors found ({len(neighbor_labels)}) is less than k ({self.k}).")
+
+        accuracy = correct_counts / total_counts  # Calculate accuracy
+        return accuracy
+
+    def predict(self, X_val):
+        if self.nbrs is None:
+            raise ValueError("Model has not been trained yet. Please call fit() before predict().")
+
+        # Perform radius search for each validation data point
+        _, indices = self.nbrs.radius_neighbors(X_val, self.radius)
+
+        y_pred = []
+
+        # Iterate through each validation data point and make predictions
+        for i in range(len(X_val)):
+            neighbor_labels = self.y_train[indices[i]]  # Get labels of neighbors within the radius
+            if len(neighbor_labels) >= self.k:  # Check if the number of neighbors is at least k
+                predicted_label = np.bincount(neighbor_labels).argmax()  # Predict label based on majority vote
+                y_pred.append(predicted_label)
+            else:
+                raise ValueError(f"Number of neighbors found ({len(neighbor_labels)}) is less than k ({self.k}).")
+
+        return np.array(y_pred)
 
 
 class ModelBuilding:
+    """
+    Class for building, optimizing and evaluating machine learning models.
+
+    Parameters:
+        X_train (array-like): Training data.
+        y_train (array-like): Training labels.
+        X_test (array-like): Test data.
+        y_test (array-like): Test labels.
+        X_val (array-like): Validation data.
+        y_val (array-like): Validation labels.
+        k (int): Number of folds for cross-validation. Default is 5.
+        save_all (bool): Flag to save all models. Default is True.
+
+    Attributes:
+        X_train (array-like): Training data.
+        y_train (array-like): Training labels.
+        X_test (array-like): Test data.
+        y_test (array-like): Test labels.
+        X_val (array-like): Validation data.
+        y_val (array-like): Validation labels.
+        k (int): Number of folds for cross-validation.
+        save_all (bool): Flag to save all models.
+        best_model (object): Best performing model.
+        best_model_name (str): Name of the best performing model.
+        best_params (tuple): Best parameters for the best performing model.
+        best_score (float): Best validation score.
+        best_model_changed (bool): Flag to track if the best model changed.
+        history (dict): Dictionary to store the validation scores of all models.
+
+    Methods:
+        build_models: Builds, optimizes and evaluates machine learning models.
+        evaluate_best_model: Evaluates the best model on the test set.
+        save_model: Saves the model to a file.
+    """
+
     def __init__(self, X_train, y_train, X_test, y_test, X_val, y_val, k=5, save_all=True):
+
         self.X_train = X_train
         self.y_train = y_train
         self.X_test = X_test
@@ -1301,10 +1431,24 @@ class ModelBuilding:
         self.best_model_name = None
         self.best_params = None
         self.best_score = -1
-        self.best_model_changed = False  # Flag to track if the best model changed
+        self.best_model_changed = False
         self.history = {}
 
     def build_models(self, model_name, models_dict):
+        """
+        Builds, optimizes and evaluates machine learning models.
+
+        Parameters:
+            model_name (str): Name of the model to build.
+            models_dict (dict): Dictionary containing the models to build.
+
+        Returns:
+            dict: History of validation scores for all models.
+            float: Average accuracy during cross-validation.
+            float: Average sensitivity during cross-validation.
+            float: Average specificity during cross-validation.
+        """
+
         model_optimization = ModelOptimization(self.X_train, self.y_train, self.X_val, self.y_val)
         print("\nTraining", model_name, "model")
         for name, model_params in models_dict.items():
@@ -1314,9 +1458,9 @@ class ModelBuilding:
             model_params_check = {}
 
             if model_name == "KNN":
-                k = model_optimization.optimize_knn(model_params['n_neighbors'])
-                model_params_check['n_neighbors'] = k
-                params = {'n_neighbors': k}
+                k = model_optimization.optimize_knn(model_params['k'])
+                model_params_check['k'] = k
+                params = {'k': k}
             elif model_name == "LogisticRegression":
                 lr_params = model_optimization.optimize_logistic_regression(**model_params)
                 model_params_check['C'] = lr_params[0]
@@ -1378,12 +1522,25 @@ class ModelBuilding:
         return self.history, self.avg_accuracy, self.avg_sensitivity, self.avg_specificity
 
     def evaluate_best_model(self):
+        """
+        Evaluates the best model on the test set.
+
+        Returns:
+            float: Test set score.
+        """
 
         print("\nEvaluating best model on test set!")
         test_score = self.best_model.score(self.X_test, self.y_test)
         print("Test set score:", test_score)
 
     def save_model(self, model, filename):
+        """
+        Saves the model to a file.
+
+        Parameters:
+            model: Trained machine learning model.
+            filename (str): Name of the file to save the model.
+        """
 
         folder_path = "./models"
         full_path = os.path.join(folder_path, filename)
@@ -1393,18 +1550,41 @@ class ModelBuilding:
 
 class BaggingClassifier:
     """
-    Performs bagging with a provided model.
+    A class for implementing the Bagging ensemble method with a base model.
+
+    Parameters:
+        base_model: Base machine learning model to use for bagging.
+        X_train (array-like): Training features.
+        y_train (array-like): Training labels.
+        X_test (array-like): Test features.
+        y_test (array-like): Test labels.
+        n_straps (int): Number of bootstrap samples. Default is 100.
+        k_fold (int): Number of folds for cross-validation. Default is 5.
+
+    Attributes:
+        base_model: Base machine learning model to use for bagging.
+        n_straps (int): Number of bootstrap samples.
+        k_fold (int): Number of folds for cross-validation.
+        models (list): List of trained models.
+        X_train (array-like): Training features.
+        y_train (array-like): Training labels.
+        X_test (array-like): Test features.
+        y_test (array-like): Test labels.
+        accuracy_scores (list): List of accuracy scores.
+        sensitivity_scores (list): List of sensitivity scores.
+        specificity_scores (list): List of specificity scores.
+        avg_accuracy (float): Average accuracy score.
+        avg_sensitivity (float): Average sensitivity score.
+        avg_specificity (float): Average specificity score.
+
+    Methods:
+        examine_bagging: Fits the bagging ensemble on the training data with k fold cross-validation.
+        predict: Predicts class labels for input data.
+        evaluate: Evaluates the bagging ensemble on test data.
     """
 
     def __init__(self, base_model, X_train, y_train, X_test, y_test, n_straps=100, k_fold=5):
-        """
-        Initializes the BaggingClassifier object.
 
-        Parameters:
-            base_model: Base machine learning model to use for bagging.
-            n_straps (int): Number of bootstrap samples. Default is 10.
-            k_fold (int): Number of folds for cross-validation. Default is 5.
-        """
         self.base_model = base_model
         self.n_straps = n_straps
         self.k_fold = k_fold
@@ -1415,10 +1595,16 @@ class BaggingClassifier:
         self.accuracy_scores = []
         self.sensitivity_scores = []
         self.specificity_scores = []
+        self.avg_accuracy = None
+        self.avg_sensitivity = None
+        self.avg_specificity = None
 
     def examine_bagging(self):
         """
         Fits the bagging ensemble on the training data with k fold cross-validation.
+
+        Returns:
+            tuple: Average accuracy, sensitivity, and specificity scores.
         """
         kfold = KFold(n_splits=self.k_fold, shuffle=True)
         for train_index, val_index in kfold.split(self.X_train):
@@ -1454,7 +1640,7 @@ class BaggingClassifier:
         Predicts class labels for input data.
 
         Parameters:
-            X (array-like): Input features.
+            X (array-like): Features.
 
         Returns:
             array-like: Predicted class labels.
@@ -1487,38 +1673,61 @@ class BaggingClassifier:
 
 class AdaBoostClassifier:
     """
-    Performs AdaBoost with a provided weak learner.
+    A class for implementing the AdaBoost ensemble method with a base model.
+
+    Parameters:
+        best_model: Best model to use for AdaBoost.
+        X_train (array-like): Training features.
+        y_train (array-like): Training labels.
+        X_test (array-like): Test features.
+        y_test (array-like): Test labels.
+        builder (object): Builder object with the configurations of the model.
+        n_estimators (int): Number of weak learners. Default is 50.
+        learning_rate (float): Learning rate shrinks the contribution of each weak learner. Default is 1.0.
+        k_fold (int): Number of folds for cross-validation. Default is 5.
+
+    Attributes:
+        best_model: Best model to use for AdaBoost.
+        n_estimators (int): Number of weak learners.
+        learning_rate (float): Learning rate shrinks the contribution of each weak learner.
+        k_fold (int): Number of folds for cross-validation.
+        models (list): List of trained models.
+        X_train (array-like): Training features.
+        y_train (array-like): Training labels.
+        X_test (array-like): Test features.
+        y_test (array-like): Test labels.
+        accuracy_scores (list): List of accuracy scores.
+        sensitivity_scores (list): List of sensitivity scores.
+        specificity_scores (list): List of specificity scores.
+        builder (object): Builder object with the configurations of the model.
+        avg_accuracy (float): Average accuracy score.
+
+    Methods:
+        train_adaboost: Trains the AdaBoost ensemble on the training data with k fold cross-validation.
+        predict: Predicts class labels for input data.
+        evaluate: Evaluates the AdaBoost ensemble on test data.
     """
     def __init__(self, best_model, X_train, y_train, X_test, y_test, builder, n_estimators=50, learning_rate=1.0, k_fold=5):
-        """
-        Initializes the AdaBoostClassifier object.
 
-        Parameters:
-            X_train (array-like): Training features.
-            y_train (array-like): Training labels.
-            X_test (array-like): Test features.
-            y_test (array-like): Test labels.
-            builder (object): Builder object with the configurations of the model.
-            n_estimators (int): Number of weak learners. Default is 50.
-            learning_rate (float): Learning rate shrinks the contribution of each weak learner. Default is 1.0.
-            k_fold (int): Number of folds for cross-validation. Default is 5.
-        """
+        self.best_model = best_model
         self.n_estimators = n_estimators
         self.learning_rate = learning_rate
         self.k_fold = k_fold
         self.models = []
         self.X_train, self.y_train = X_train, y_train
-        self.X_test = X_test
-        self.y_test = y_test
+        self.X_test, self.y_test = X_test, y_test
         self.accuracy_scores = []
         self.sensitivity_scores = []
         self.specificity_scores = []
         self.builder = builder
-        self.best_model = best_model
+        self.avg_accuracy = None
 
     def train_adaboost(self):
         """
         Trains the AdaBoost ensemble on the training data with k fold cross-validation.
+
+        Returns:
+            float: Average accuracy score.
         """
         kfold = KFold(n_splits=self.k_fold, shuffle=True)
         for train_index, val_index in kfold.split(self.X_train):
@@ -1586,7 +1795,7 @@ class AdaBoostClassifier:
         Predicts class labels for input data.
 
         Parameters:
-            index (array-like): Indices of data to predict.
+            index (array-like): Indices of the data to predict.
 
         Returns:
             array-like: Predicted class labels.
@@ -1627,14 +1836,45 @@ class AdaBoostClassifier:
 
 
 class CNN:
+    """
+    A class to implement a Convolutional Neural Network (CNN) for binary classification.
+
+    Parameters:
+        X_train (array-like): Training data.
+        y_train (array-like): Training labels.
+        X_test (array-like): Test data.
+        y_test (array-like): Test labels.
+        X_val (array-like): Validation data.
+        y_val (array-like): Validation labels.
+        input_shape (tuple): Shape of the input data.
+        num_classes (int): Number of classes.
+        epochs (int): Number of epochs. Default is 10.
+        batch_size (int): Batch size. Default is 32.
+
+    Attributes:
+        X_train (array-like): Training data.
+        y_train (array-like): Training labels.
+        X_test (array-like): Test data.
+        y_test (array-like): Test labels.
+        X_val (array-like): Validation data.
+        y_val (array-like): Validation labels.
+        input_shape (tuple): Shape of the input data.
+        num_classes (int): Number of classes.
+        epochs (int): Number of epochs.
+        batch_size (int): Batch size.
+        model (object): CNN model.
+
+    Methods:
+        build_model: Builds the CNN model.
+        train: Trains the CNN model.
+        evaluate: Evaluates the CNN model.
+    """
+
     def __init__(self, X_train, y_train, X_test, y_test, X_val, y_val, input_shape, num_classes, epochs=10, batch_size=32):
 
-        self.X_train = X_train
-        self.y_train = y_train
-        self.X_test = X_test
-        self.y_test = y_test
-        self.X_val = X_val
-        self.y_val = y_val
+        self.X_train, self.y_train = X_train, y_train
+        self.X_test, self.y_test = X_test, y_test
+        self.X_val, self.y_val = X_val, y_val
         self.input_shape = input_shape
         self.num_classes = num_classes
         self.epochs = epochs
@@ -1642,44 +1882,54 @@ class CNN:
         self.model = self.build_model()
 
     def build_model(self):
+        """
+        Builds the CNN model.
 
-        max_words = 10000
-        maxlen = 100
-        (self.X_train, self.y_train), (self.X_test, self.y_test) = reuters.load_data(num_words=max_words, maxlen=maxlen)
-
-        # Pad sequences to make them of equal length
-        self.X_train = pad_sequences(self.X_train, maxlen=maxlen)
-        self.X_test = pad_sequences(self.X_test, maxlen=maxlen)
+        Returns:
+            object: CNN model.
+        """
 
         model = Sequential([
-            Embedding(input_dim=max_words, output_dim=50, input_length=maxlen),
-            Conv1D(filters=32, kernel_size=3, activation='relu'),
+            Conv1D(filters=32, kernel_size=3, activation='relu', input_shape=(self.input_shape[0], 1)),
             MaxPooling1D(pool_size=2),
+            Conv1D(filters=64, kernel_size=3, activation='relu'),
+            MaxPooling1D(pool_size=2),
+            LSTM(64, return_sequences=True),
             Flatten(),
             Dense(64, activation='relu'),
-            Dense(1, activation='sigmoid')
+            Dense(1, activation='sigmoid')  # 1 porque estamos a fazer classificação binária
         ])
 
         model.compile(optimizer='adam',
                       loss='binary_crossentropy',
                       metrics=['accuracy'])
 
-        self.early_stopping = EarlyStopping(monitor='val_loss', patience=3, restore_best_weights=True)
-
         return model
 
     def train(self):
+        """
+        Trains the CNN model.
+
+        Returns:
+            object: Training history.
+        """
 
         # Ensure target labels are one-dimensional
         y_train = self.y_train.squeeze()
         y_val = self.y_val.squeeze()
 
         history = self.model.fit(self.X_train, y_train, batch_size=self.batch_size, epochs=self.epochs,
-                                 verbose=1, validation_data=(self.X_val, y_val), callbacks=[self.early_stopping])
-
+                                 verbose=1, validation_data=(self.X_val, y_val))
         return history
 
     def evaluate(self):
+        """
+        Evaluates the CNN model.
+
+        Returns:
+            list: Scores of the model.
+        """
+
         # Ensure target labels are one-dimensional
         y_test = self.y_test.squeeze()
 
@@ -1730,7 +1980,7 @@ class ClusteringModel:
         self.test_labels = None
 
     def hierarchical_clustering(self):
-        print("Hierarchical Clustering:")
+        print("\nHierarchical Clustering:")
         # Random sample 1% (we have too much data to compute efficiently so we need to reduce it)
         random_sample = self.data_test.sample(n=int(0.01 * len(self.data_test)), replace=False)
         # Plot dendrogram
@@ -1876,7 +2126,7 @@ X_train, X_val, y_train, y_val = train_test_split(X_train, y_train, test_size=0.
 
 # Define the model dictionary for the optimization
 models_dict = {
-    "KNN": {"model": KNeighborsClassifier, "n_neighbors": (3, 5, 7)},
+    "KNN": {"model": KNearestNeighbors, "k": (3, 5, 7)},
     "LogisticRegression": {"model": LogisticRegression, "C_values": (0.01, 0.1, 1.0, 10.0), "penalty": (None, 'l2')},
     "DecisionTree": {"model": DecisionTreeClassifier, "max_depth_values": (None, 5, 10, 20)},
     "MLP": {"model": MLPClassifier, "population_size": 5, "max_generations": 20, "layer_range": (150, 300),
@@ -1886,10 +2136,10 @@ models_dict = {
 # Create an instance of ModelBuilder
 builder = ModelBuilding(np.array(X_train), np.array(y_train), np.array(X_test), np.array(y_test), np.array(X_val), np.array(y_val))
 
-#builder.build_models("MLP", models_dict)
-#builder.build_models("KNN", models_dict)
-#builder.build_models("LogisticRegression", models_dict)
+builder.build_models("LogisticRegression", models_dict)
+builder.build_models("KNN", models_dict)
 builder.build_models("DecisionTree", models_dict)
+builder.build_models("MLP", models_dict)
 
 builder.evaluate_best_model()
 
@@ -1902,11 +2152,11 @@ with open('builder.pkl', 'rb') as f:
 print("\nBest model:", builder.best_model_checked)
 print("Best model parameters:", builder.best_model_params_checked)
 
-# # Perform bagging on the best model
-# bagging = BaggingClassifier(builder.best_model_checked(**builder.best_model_params_checked), np.array(X_train),
-#                             np.array(y_train), np.array(X_test), np.array(y_test))
-# bagging.examine_bagging()
-# bagging.evaluate()
+# Perform bagging on the best model
+bagging = BaggingClassifier(builder.best_model_checked(**builder.best_model_params_checked), np.array(X_train),
+                            np.array(y_train), np.array(X_test), np.array(y_test))
+bagging.examine_bagging()
+bagging.evaluate()
 
 # best_model_name = None
 #
@@ -1932,10 +2182,15 @@ num_classes = len(np.unique(y_train))
 # Reshape the data for CNN
 X_train_cnn = X_train.values.reshape(X_train.shape[0], X_train.shape[1], 1)
 X_test_cnn = X_test.values.reshape(X_test.shape[0], X_test.shape[1], 1)
+X_val = X_val.values.reshape(X_val.shape[0], X_val.shape[1], 1)
 
 # Print the shapes of X_train_cnn and X_test_cnn
 print("Shape of X_train_cnn:", X_train_cnn.shape)
 print("Shape of X_test_cnn:", X_test_cnn.shape)
+print("Shape of X_val:", X_val.shape)
+print("Shape of y_train:", y_train.shape)
+print("Shape of y_test:", y_test.shape)
+print("Shape of y_val:", y_val.shape)
 
 # Create an instance of CNN
 cnn = CNN(X_train_cnn, y_train, X_test_cnn, y_test, X_val, y_val, input_shape, num_classes)
@@ -1948,8 +2203,8 @@ history = cnn.train()
 
 # Evaluate the CNN model
 scores = cnn.evaluate()
-print("CNN Loss:", scores[0])
+print("\nCNN Loss:", scores[0])
 print("CNN Accuracy:", scores[1])
 
-# clustering_model = ClusteringModel(X_train, X_test, 10)
-# clustering_model.perform_clustering()
+clustering_model = ClusteringModel(X_train, X_test, 10)
+clustering_model.perform_clustering()
