@@ -1,39 +1,39 @@
 # %% 0- Classes
-import pandas as pd
-import numpy as np
-import seaborn as sns
-import matplotlib.pyplot as plt
-from imblearn.combine import SMOTEENN
-from imblearn.under_sampling import RandomUnderSampler
-from plotly.figure_factory._dendrogram import sch
-from sklearn.cluster import KMeans, OPTICS
-from sklearn.ensemble import RandomForestClassifier
-from sklearn.inspection import permutation_importance
-from sklearn.mixture import GaussianMixture
-from sklearn.neighbors import KNeighborsClassifier, NearestNeighbors
-from sklearn.linear_model import LogisticRegression
-from sklearn.neural_network import MLPClassifier
-from sklearn.tree import DecisionTreeClassifier
-from sklearn.preprocessing import StandardScaler
-from sklearn.decomposition import PCA
-from sklearn.model_selection import train_test_split, KFold
-from sklearn.metrics import accuracy_score
-from sklearn.base import clone
-import umap
-from scipy.stats import ttest_ind, probplot, shapiro
-import statsmodels.stats.api as sms
-from pycm import ConfusionMatrix
-import joblib
 import os
 import pickle
-#from keras.src.applications.mobilenet_v2 import MobileNetV2
-#from keras.src.callbacks import EarlyStopping
-#from keras.src.layers import GlobalAveragePooling2D
-from tensorflow.keras.layers import Dense, ZeroPadding2D, Conv1D, MaxPooling1D, Flatten, LSTM
-from tensorflow.keras.models import Sequential
 import random
-
 import warnings
+
+import joblib
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+import seaborn as sns
+import statsmodels.stats.api as sms
+import umap
+from imblearn.combine import SMOTEENN
+from plotly.figure_factory._dendrogram import sch
+from pycm import ConfusionMatrix
+from scipy.stats import ttest_ind, probplot, shapiro
+from sklearn.base import clone
+from sklearn.cluster import KMeans, OPTICS
+from sklearn.decomposition import PCA
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.inspection import permutation_importance
+from sklearn.linear_model import LogisticRegression
+from sklearn.metrics import accuracy_score
+from sklearn.mixture import GaussianMixture
+from sklearn.model_selection import train_test_split, KFold
+from sklearn.neighbors import KNeighborsClassifier, NearestNeighbors
+from sklearn.neural_network import MLPClassifier
+from sklearn.preprocessing import StandardScaler
+from sklearn.tree import DecisionTreeClassifier
+# from keras.src.applications.mobilenet_v2 import MobileNetV2
+# from keras.src.callbacks import EarlyStopping
+# from keras.src.layers import GlobalAveragePooling2D
+from tensorflow.keras.layers import Dense, Conv1D, MaxPooling1D, Flatten, LSTM
+from tensorflow.keras.models import Sequential
+
 warnings.filterwarnings("ignore")
 
 
@@ -2109,7 +2109,7 @@ data_loader.data.to_csv('data/heart_2020_final.csv', index=False)
 
 # %% 4- Model Building
 
-under_sampler = RandomUnderSampler(random_state=42)
+# Initialize the SMOTEENN class for oversampling and undersampling
 smote_enn = SMOTEENN(random_state=42)
 
 # Divide the data into features and target variable
@@ -2123,10 +2123,10 @@ X_train_under, X_test, y_train_under, y_test = train_test_split(X, y, test_size=
 print("Class distribution before resampling:")
 print(y_train_under.value_counts())
 
-# For under-sampling
+# Resample the training data
 X_train, y_train = smote_enn.fit_resample(X_train_under, y_train_under)
 
-print("\nClass distribution after RandomUnderSampler:")
+print("\nClass distribution after resampling:")
 print(y_train.value_counts())
 
 # Split the training set into training and validation sets
@@ -2180,13 +2180,13 @@ bagging.evaluate()
 best_model_name = None
 
 # Check the best model
-if (builder.best_model_checked == KNearestNeighbors):
+if builder.best_model_checked == KNearestNeighbors:
     best_model_name = 'KNN'
-elif (builder.best_model_checked == LogisticRegression):
+elif builder.best_model_checked == LogisticRegression:
     best_model_name = 'LogisticRegression'
-elif (builder.best_model_checked == DecisionTreeClassifier):
+elif builder.best_model_checked == DecisionTreeClassifier:
     best_model_name = 'DecisionTree'
-elif (builder.best_model_checked == MLPClassifier):
+elif builder.best_model_checked == MLPClassifier:
     best_model_name = 'MLP'
 
 # Initialize the AdaBoostClassifier class with the best model
