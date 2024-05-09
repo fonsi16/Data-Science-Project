@@ -3,6 +3,8 @@ import pandas as pd
 import numpy as np
 import seaborn as sns
 import matplotlib.pyplot as plt
+from imblearn.combine import SMOTEENN
+from imblearn.under_sampling import RandomUnderSampler
 from plotly.figure_factory._dendrogram import sch
 from sklearn.cluster import KMeans, OPTICS
 from sklearn.ensemble import RandomForestClassifier
@@ -11,7 +13,6 @@ from sklearn.mixture import GaussianMixture
 from sklearn.neighbors import KNeighborsClassifier, NearestNeighbors
 from sklearn.linear_model import LogisticRegression
 from sklearn.neural_network import MLPClassifier
-from sklearn.svm import SVC
 from sklearn.tree import DecisionTreeClassifier
 from sklearn.preprocessing import StandardScaler
 from sklearn.decomposition import PCA
@@ -23,19 +24,13 @@ from scipy.stats import ttest_ind, probplot, shapiro
 import statsmodels.stats.api as sms
 from pycm import ConfusionMatrix
 import joblib
-from joblib import Parallel, delayed
 import os
 import pickle
 #from keras.src.applications.mobilenet_v2 import MobileNetV2
-from tensorflow.keras.applications import MobileNetV2
 #from keras.src.callbacks import EarlyStopping
-from tensorflow.keras.callbacks import EarlyStopping
 #from keras.src.layers import GlobalAveragePooling2D
-from tensorflow.keras.layers import Dense, ZeroPadding2D, GlobalAveragePooling2D, Embedding, Conv1D, MaxPooling1D, Flatten, LSTM
+from tensorflow.keras.layers import Dense, ZeroPadding2D, Conv1D, MaxPooling1D, Flatten, LSTM
 from tensorflow.keras.models import Sequential
-from tensorflow.keras.utils import to_categorical
-from tensorflow.keras.datasets import reuters
-from tensorflow.keras.preprocessing.sequence import pad_sequences
 import random
 
 import warnings
@@ -1061,6 +1056,59 @@ class FeatureCreation:
         self._age_sleep_interaction_feature()
 
 
+class KNearestNeighbors:
+    def __init__(self, k, radius=75):
+        self.k = k
+        self.radius = radius
+        self.nbrs = None
+        self.y_train = None
+
+    def fit(self, X_train, y_train):
+        # Initialize NearestNeighbors object with algorithm='ball_tree' for efficient nearest neighbor search
+        self.nbrs = NearestNeighbors(n_neighbors=self.k, algorithm='ball_tree').fit(X_train)
+        self.y_train = y_train
+
+    def score(self, X_val, y_val):
+        # Perform radius search for each validation data point
+        _, indices = self.nbrs.radius_neighbors(X_val, self.radius)
+
+        correct_counts = 0
+        total_counts = len(X_val)
+
+        # Iterate through each validation data point and count correct predictions
+        for i in range(total_counts):
+            neighbor_labels = self.y_train[indices[i]]  # Get labels of neighbors within the radius
+            if len(neighbor_labels) >= self.k:  # Check if the number of neighbors is at least k
+                predicted_label = np.bincount(neighbor_labels).argmax()  # Predict label based on majority vote
+                if predicted_label == y_val[i]:  # Check if prediction matches the true label
+                    correct_counts += 1
+            else:
+                raise ValueError(f"\nNumber of neighbors found ({len(neighbor_labels)}) is less than k ({self.k}).")
+
+        accuracy = correct_counts / total_counts  # Calculate accuracy
+        return accuracy
+
+    def predict(self, X_val):
+        if self.nbrs is None:
+            raise ValueError("Model has not been trained yet. Please call fit() before predict().")
+
+        # Perform radius search for each validation data point
+        _, indices = self.nbrs.radius_neighbors(X_val, self.radius)
+
+        y_pred = []
+
+        # Iterate through each validation data point and make predictions
+        for i in range(len(X_val)):
+            neighbor_labels = self.y_train[indices[i]]  # Get labels of neighbors within the radius
+            if len(neighbor_labels) >= self.k:  # Check if the number of neighbors is at least k
+                predicted_label = np.bincount(neighbor_labels).argmax()  # Predict label based on majority vote
+                y_pred.append(predicted_label)
+            else:
+                raise ValueError(f"\nNumber of neighbors found ({len(neighbor_labels)}) is less than k ({self.k}).")
+
+        return np.array(y_pred)
+
+
 class ModelOptimization:
     """
     Class for optimizing the parameters of different classifiers.
@@ -1326,59 +1374,6 @@ class CrossValidator:
         sensitivity = cm.TPR_Macro
         specificity = cm.TNR_Macro
         return accuracy, sensitivity, specificity
-
-
-class KNearestNeighbors:
-    def __init__(self, k, radius=100):
-        self.k = k
-        self.radius = radius
-        self.nbrs = None
-        self.y_train = None
-
-    def fit(self, X_train, y_train):
-        # Initialize NearestNeighbors object with algorithm='ball_tree' for efficient nearest neighbor search
-        self.nbrs = NearestNeighbors(n_neighbors=self.k, algorithm='ball_tree').fit(X_train)
-        self.y_train = y_train
-
-    def score(self, X_val, y_val):
-        # Perform radius search for each validation data point
-        _, indices = self.nbrs.radius_neighbors(X_val, self.radius)
-
-        correct_counts = 0
-        total_counts = len(X_val)
-
-        # Iterate through each validation data point and count correct predictions
-        for i in range(total_counts):
-            neighbor_labels = self.y_train[indices[i]]  # Get labels of neighbors within the radius
-            if len(neighbor_labels) >= self.k:  # Check if the number of neighbors is at least k
-                predicted_label = np.bincount(neighbor_labels).argmax()  # Predict label based on majority vote
-                if predicted_label == y_val[i]:  # Check if prediction matches the true label
-                    correct_counts += 1
-            else:
-                raise ValueError(f"Number of neighbors found ({len(neighbor_labels)}) is less than k ({self.k}).")
-
-        accuracy = correct_counts / total_counts  # Calculate accuracy
-        return accuracy
-
-    def predict(self, X_val):
-        if self.nbrs is None:
-            raise ValueError("Model has not been trained yet. Please call fit() before predict().")
-
-        # Perform radius search for each validation data point
-        _, indices = self.nbrs.radius_neighbors(X_val, self.radius)
-
-        y_pred = []
-
-        # Iterate through each validation data point and make predictions
-        for i in range(len(X_val)):
-            neighbor_labels = self.y_train[indices[i]]  # Get labels of neighbors within the radius
-            if len(neighbor_labels) >= self.k:  # Check if the number of neighbors is at least k
-                predicted_label = np.bincount(neighbor_labels).argmax()  # Predict label based on majority vote
-                y_pred.append(predicted_label)
-            else:
-                raise ValueError(f"Number of neighbors found ({len(neighbor_labels)}) is less than k ({self.k}).")
-
-        return np.array(y_pred)
 
 
 class ModelBuilding:
@@ -2114,12 +2109,25 @@ data_loader.data.to_csv('data/heart_2020_final.csv', index=False)
 
 # %% 4- Model Building
 
+under_sampler = RandomUnderSampler(random_state=42)
+smote_enn = SMOTEENN(random_state=42)
+
 # Divide the data into features and target variable
 X = data_loader.data.drop(columns=[data_loader.target])
 y = data_loader.data[data_loader.target]
 
 # Split the data into training and testing sets
-X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+X_train_under, X_test, y_train_under, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+
+# Print class distribution before resampling
+print("Class distribution before resampling:")
+print(y_train_under.value_counts())
+
+# For under-sampling
+X_train, y_train = smote_enn.fit_resample(X_train_under, y_train_under)
+
+print("\nClass distribution after RandomUnderSampler:")
+print(y_train.value_counts())
 
 # Split the training set into training and validation sets
 X_train, X_val, y_train, y_val = train_test_split(X_train, y_train, test_size=0.2, random_state=42)
@@ -2133,48 +2141,63 @@ models_dict = {
             "activation": ("tanh", "logistic", "relu")}
 }
 
-# Create an instance of ModelBuilder
+# Initialize the ModelBuilding class with the training, testing and validation data
 builder = ModelBuilding(np.array(X_train), np.array(y_train), np.array(X_test), np.array(y_test), np.array(X_val), np.array(y_val))
 
-builder.build_models("LogisticRegression", models_dict)
+# KNN Algorithm
 builder.build_models("KNN", models_dict)
+
+# Supervised Learning Algorithms
+builder.build_models("LogisticRegression", models_dict)
 builder.build_models("DecisionTree", models_dict)
 builder.build_models("MLP", models_dict)
 
+# Evaluate the best model on the test set
 builder.evaluate_best_model()
 
 # Serialize the builder object
 with open('builder.pkl', 'wb') as f:
     pickle.dump(builder, f)
 
+# Deserialize the builder object
 with open('builder.pkl', 'rb') as f:
     builder = pickle.load(f)
 print("\nBest model:", builder.best_model_checked)
 print("Best model parameters:", builder.best_model_params_checked)
 
-# Perform bagging on the best model
+# Ensemble Learning Models
+
+# Initialize the BaggingClassifier class with the best model
 bagging = BaggingClassifier(builder.best_model_checked(**builder.best_model_params_checked), np.array(X_train),
                             np.array(y_train), np.array(X_test), np.array(y_test))
+
+# Examine the bagging ensemble
 bagging.examine_bagging()
+# Evaluate the bagging ensemble on the test set
 bagging.evaluate()
 
-# best_model_name = None
-#
-# if (builder.best_model_checked == KNeighborsClassifier):
-#     best_model_name = 'KNN'
-# elif (builder.best_model_checked == LogisticRegression):
-#     best_model_name = 'LogisticRegression'
-# elif (builder.best_model_checked == DecisionTreeClassifier):
-#     best_model_name = 'DecisionTree'
-# elif (builder.best_model_checked == MLPClassifier):
-#     best_model_name = 'MLP'
-#
-# # Perform AdaBoost on the best model
-# adaboost = AdaBoostClassifier(best_model_name, np.array(X_train), np.array(y_train), np.array(X_test), np.array(y_test), builder)
-# adaboost.train_adaboost()
-# adaboost.evaluate()
+# Name of the best model
+best_model_name = None
 
-#CNN
+# Check the best model
+if (builder.best_model_checked == KNearestNeighbors):
+    best_model_name = 'KNN'
+elif (builder.best_model_checked == LogisticRegression):
+    best_model_name = 'LogisticRegression'
+elif (builder.best_model_checked == DecisionTreeClassifier):
+    best_model_name = 'DecisionTree'
+elif (builder.best_model_checked == MLPClassifier):
+    best_model_name = 'MLP'
+
+# Initialize the AdaBoostClassifier class with the best model
+adaboost = AdaBoostClassifier(best_model_name, np.array(X_train), np.array(y_train), np.array(X_test), np.array(y_test), builder)
+# Train the AdaBoost ensemble
+adaboost.train_adaboost()
+# Evaluate the AdaBoost ensemble on the test set
+adaboost.evaluate()
+
+# Deep Learning Model
+
 # Define the input shape and number of classes
 input_shape = (X_train.shape[1], 1)
 num_classes = len(np.unique(y_train))
@@ -2183,14 +2206,6 @@ num_classes = len(np.unique(y_train))
 X_train_cnn = X_train.values.reshape(X_train.shape[0], X_train.shape[1], 1)
 X_test_cnn = X_test.values.reshape(X_test.shape[0], X_test.shape[1], 1)
 X_val = X_val.values.reshape(X_val.shape[0], X_val.shape[1], 1)
-
-# Print the shapes of X_train_cnn and X_test_cnn
-print("Shape of X_train_cnn:", X_train_cnn.shape)
-print("Shape of X_test_cnn:", X_test_cnn.shape)
-print("Shape of X_val:", X_val.shape)
-print("Shape of y_train:", y_train.shape)
-print("Shape of y_test:", y_test.shape)
-print("Shape of y_val:", y_val.shape)
 
 # Create an instance of CNN
 cnn = CNN(X_train_cnn, y_train, X_test_cnn, y_test, X_val, y_val, input_shape, num_classes)
@@ -2206,5 +2221,9 @@ scores = cnn.evaluate()
 print("\nCNN Loss:", scores[0])
 print("CNN Accuracy:", scores[1])
 
+# Clustering Model
+
+# Initialize the ClusteringModel class with the training and testing data
 clustering_model = ClusteringModel(X_train, X_test, 10)
+# Perform clustering and visualize the results
 clustering_model.perform_clustering()
