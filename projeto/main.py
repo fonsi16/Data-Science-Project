@@ -12,6 +12,7 @@ import seaborn as sns
 import statsmodels.stats.api as sms
 import umap
 from imblearn.combine import SMOTEENN
+from imblearn.under_sampling import RandomUnderSampler
 from plotly.figure_factory._dendrogram import sch
 from pycm import ConfusionMatrix
 from scipy.stats import ttest_ind, probplot, shapiro
@@ -1057,7 +1058,7 @@ class FeatureCreation:
 
 
 class KNearestNeighbors:
-    def __init__(self, k, radius=75):
+    def __init__(self, k, radius=30):
         self.k = k
         self.radius = radius
         self.nbrs = None
@@ -1069,6 +1070,10 @@ class KNearestNeighbors:
         self.y_train = y_train
 
     def score(self, X_val, y_val):
+
+        if self.nbrs is None:
+            raise ValueError("Model has not been trained yet. Please call fit() before score().")
+
         # Perform radius search for each validation data point
         _, indices = self.nbrs.radius_neighbors(X_val, self.radius)
 
@@ -1077,18 +1082,24 @@ class KNearestNeighbors:
 
         # Iterate through each validation data point and count correct predictions
         for i in range(total_counts):
+
             neighbor_labels = self.y_train[indices[i]]  # Get labels of neighbors within the radius
-            if len(neighbor_labels) >= self.k:  # Check if the number of neighbors is at least k
-                predicted_label = np.bincount(neighbor_labels).argmax()  # Predict label based on majority vote
-                if predicted_label == y_val[i]:  # Check if prediction matches the true label
-                    correct_counts += 1
-            else:
-                raise ValueError(f"\nNumber of neighbors found ({len(neighbor_labels)}) is less than k ({self.k}).")
+
+            while len(neighbor_labels) < self.k:  # If the number of neighbors is less than k
+                self.radius += 3  # Increase the radius
+                _, indices = self.nbrs.radius_neighbors(X_val, self.radius)  # Perform radius search again
+                neighbor_labels = self.y_train[indices[i]] # Get labels of neighbors within the new radius
+
+            predicted_label = np.bincount(neighbor_labels).argmax()  # Predict label based on majority vote
+            if predicted_label == y_val[i]:  # Check if prediction matches the true label
+                correct_counts += 1
 
         accuracy = correct_counts / total_counts  # Calculate accuracy
+        print(self.radius)
         return accuracy
 
     def predict(self, X_val):
+
         if self.nbrs is None:
             raise ValueError("Model has not been trained yet. Please call fit() before predict().")
 
@@ -1099,13 +1110,17 @@ class KNearestNeighbors:
 
         # Iterate through each validation data point and make predictions
         for i in range(len(X_val)):
-            neighbor_labels = self.y_train[indices[i]]  # Get labels of neighbors within the radius
-            if len(neighbor_labels) >= self.k:  # Check if the number of neighbors is at least k
-                predicted_label = np.bincount(neighbor_labels).argmax()  # Predict label based on majority vote
-                y_pred.append(predicted_label)
-            else:
-                raise ValueError(f"\nNumber of neighbors found ({len(neighbor_labels)}) is less than k ({self.k}).")
 
+            neighbor_labels = self.y_train[indices[i]]  # Get labels of neighbors within the radius
+
+            while len(neighbor_labels) < self.k:  # If the number of neighbors is less than k
+                self.radius += 3  # Increase the radius
+                _, indices = self.nbrs.radius_neighbors(X_val, self.radius)  # Perform radius search again
+                neighbor_labels = self.y_train[indices[i]]  # Get labels of neighbors within the new radius
+
+            predicted_label = np.bincount(neighbor_labels).argmax()  # Predict label based on majority vote
+            y_pred.append(predicted_label)
+        print(self.radius)
         return np.array(y_pred)
 
 
@@ -1493,6 +1508,27 @@ class ModelBuilding:
             if self.save_all:
                 self.save_model(model_instance, name)
 
+        self.kf_cv = CrossValidator(k=self.k)
+
+        # Performing cross-validation on the model
+        print(f"\nPreforming cross-validation on the {model_name} model:")
+
+        avg_accuracy_cv, avg_sensitivity_cv, avg_specificity_cv = self.kf_cv.cross_validate(model_instance,
+                                                                                            self.X_train, self.y_train)
+
+        print("Average accuracy during cross-validation:", avg_accuracy_cv)
+        print("Average sensitivity during cross-validation:", avg_sensitivity_cv)
+        print(f"Average specificity during cross-validation: {avg_specificity_cv}\n")
+
+        # Performance of the model on the test set
+        print(f"\nPerformance of the {model_name} model on the Test set:")
+
+        accuracy_test, sensitivity_test, specificity_test = self.kf_cv.evaluate_on_test_set(model_instance, self.X_test,
+                                                                                            self.y_test)
+        print("Test set accuracy:", accuracy_test)
+        print("Test set sensitivity:", sensitivity_test)
+        print(f"Test set specificity: {specificity_test}\n")
+
         print("\nOptimization finished, history:\n")
         print("Model name\t\tAccuracy")  # Print header
         for model, accuracy in self.history.items():  # Print table rows
@@ -1503,30 +1539,6 @@ class ModelBuilding:
 
         if not self.save_all:
             self.save_model(self.best_model, self.best_model_name)
-
-        # Perform cross-validation only if the best model changed
-        if self.best_model_changed:
-            self.kf_cv = CrossValidator(k=self.k)
-            self.avg_accuracy, self.avg_sensitivity, self.avg_specificity = self.kf_cv.cross_validate(
-                self.best_model_checked(**self.best_model_params_checked), self.X_train, self.y_train)
-
-            print("Average accuracy during cross-validation:", self.avg_accuracy)
-            print("Average sensitivity during cross-validation:", self.avg_sensitivity)
-            print(f"Average specificity during cross-validation: {self.avg_specificity}\n")
-
-        return self.history, self.avg_accuracy, self.avg_sensitivity, self.avg_specificity
-
-    def evaluate_best_model(self):
-        """
-        Evaluates the best model on the test set.
-
-        Returns:
-            float: Test set score.
-        """
-
-        print("\nEvaluating best model on test set!")
-        test_score = self.best_model.score(self.X_test, self.y_test)
-        print("Test set score:", test_score)
 
     def save_model(self, model, filename):
         """
@@ -2111,6 +2123,7 @@ data_loader.data.to_csv('data/heart_2020_final.csv', index=False)
 
 # Initialize the SMOTEENN class for oversampling and undersampling
 smote_enn = SMOTEENN(random_state=42)
+undersample = RandomUnderSampler(random_state=42)
 
 # Divide the data into features and target variable
 X = data_loader.data.drop(columns=[data_loader.target])
@@ -2152,9 +2165,6 @@ builder.build_models("LogisticRegression", models_dict)
 builder.build_models("DecisionTree", models_dict)
 builder.build_models("MLP", models_dict)
 
-# Evaluate the best model on the test set
-builder.evaluate_best_model()
-
 # Serialize the builder object
 with open('builder.pkl', 'wb') as f:
     pickle.dump(builder, f)
@@ -2162,19 +2172,6 @@ with open('builder.pkl', 'wb') as f:
 # Deserialize the builder object
 with open('builder.pkl', 'rb') as f:
     builder = pickle.load(f)
-print("\nBest model:", builder.best_model_checked)
-print("Best model parameters:", builder.best_model_params_checked)
-
-# Ensemble Learning Models
-
-# Initialize the BaggingClassifier class with the best model
-bagging = BaggingClassifier(builder.best_model_checked(**builder.best_model_params_checked), np.array(X_train),
-                            np.array(y_train), np.array(X_test), np.array(y_test))
-
-# Examine the bagging ensemble
-bagging.examine_bagging()
-# Evaluate the bagging ensemble on the test set
-bagging.evaluate()
 
 # Name of the best model
 best_model_name = None
@@ -2188,6 +2185,20 @@ elif builder.best_model_checked == DecisionTreeClassifier:
     best_model_name = 'DecisionTree'
 elif builder.best_model_checked == MLPClassifier:
     best_model_name = 'MLP'
+
+print("\nBest model:", best_model_name)
+print("Best model parameters:", builder.best_model_params_checked)
+
+# Ensemble Learning Models
+
+# Initialize the BaggingClassifier class with the best model
+bagging = BaggingClassifier(builder.best_model_checked(**builder.best_model_params_checked), np.array(X_train),
+                            np.array(y_train), np.array(X_test), np.array(y_test))
+
+# Examine the bagging ensemble
+bagging.examine_bagging()
+# Evaluate the bagging ensemble on the test set
+bagging.evaluate()
 
 # Initialize the AdaBoostClassifier class with the best model
 adaboost = AdaBoostClassifier(best_model_name, np.array(X_train), np.array(y_train), np.array(X_test), np.array(y_test), builder)
