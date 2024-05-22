@@ -1987,7 +1987,12 @@ class AdaBoostClassifier:
 
         # Calculated accuracy
         accuracy_boost = accuracy_score(self.y_test, final_predictions)
-        print(f"\nTest Accuracy: {self.accuracy_scores}")
+
+        # Accuracy Scores
+        print(f"\nAccuracy Scores: {self.accuracy_scores}")
+
+        # Calculated accuracy
+        print(f"\nTest Accuracy: {accuracy_boost}")
 
         # Calculated sensitivity
         print(f"Test Sensitivity: {sensitivity_boost}")
