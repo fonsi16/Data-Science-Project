@@ -22,18 +22,16 @@ from sklearn.decomposition import PCA
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.inspection import permutation_importance
 from sklearn.linear_model import LogisticRegression
-from sklearn.metrics import accuracy_score
+from sklearn.metrics import accuracy_score, confusion_matrix
 from sklearn.mixture import GaussianMixture
 from sklearn.model_selection import train_test_split, KFold
 from sklearn.neighbors import KNeighborsClassifier, NearestNeighbors
 from sklearn.neural_network import MLPClassifier
 from sklearn.preprocessing import StandardScaler
 from sklearn.tree import DecisionTreeClassifier
-# from keras.src.applications.mobilenet_v2 import MobileNetV2
-# from keras.src.callbacks import EarlyStopping
-# from keras.src.layers import GlobalAveragePooling2D
 from tensorflow.keras.layers import Dense, Conv1D, MaxPooling1D, Flatten, LSTM
 from tensorflow.keras.models import Sequential
+from mlxtend.feature_selection import SequentialFeatureSelector
 
 warnings.filterwarnings("ignore")
 
@@ -42,7 +40,7 @@ class DataLoader:
     """
     Generic Class responsible for loading the dataset
 
-    Attributes:
+    Parameters:
         filename (str): The filename of the dataset to load.
         target (str): The target of the dataset to load.
 
@@ -61,7 +59,7 @@ class DataLoader:
         """
         Initializes the DataLoader with the filename of the dataset.
 
-        Args:
+        Parameters:
             filename (str): The filename of the dataset to load.
             target (str): The target of the dataset to load.
         """
@@ -81,7 +79,7 @@ class DataLoader:
         Loads the dataset from the specified filename,
         and assigns the data and labels to the appropriate attributes.
 
-        Args:
+        Parameters:
             target (str): The target of the dataset to load.
         """
         try:
@@ -104,7 +102,7 @@ class DataManipulator(DataLoader):
     """
     A class for manipulating data loaded from a file.
 
-    Args:
+    Parameters:
         filename (str): The path to the data file.
         target (str): The target variable in the data.
 
@@ -123,7 +121,7 @@ class DataManipulator(DataLoader):
         """
         Initialize the class with a filename and target variable.
 
-        Args:
+        Parameters:
             filename (str): The path to the file.
             target (str): The name of the target variable.
 
@@ -151,12 +149,29 @@ class DataManipulator(DataLoader):
         print("\nStatistical distribution of each variable:")
         print(self.data.describe())
 
+    def update_data(self, filename):
+        """
+        Updates the data attribute with the data from the specified file.
+
+        Parameters:
+            filename (str): The path to the file.
+
+        Raises:
+            FileNotFoundError: If the file is not found.
+
+        """
+        try:
+            self.data = pd.read_csv(filename)
+            print("Data updated successfully.")
+        except FileNotFoundError:
+            print("File not found. Please check the file path.")
+
 
 class DataPreProcessing:
     """
     Class for performing data preprocessing tasks, mostly encoding.
 
-    Args:
+    Parameters:
         data_loader (DataLoader): The DataLoader object containing the dataset.
 
     Attributes:
@@ -174,7 +189,7 @@ class DataPreProcessing:
         """
         Initializes an instance of the class.
 
-        Args:
+        Parameters:
             data_loader: The data loader object used to load the data.
         """
         self.data_loader = data_loader
@@ -225,7 +240,7 @@ class DataPreProcessing:
         """
         Encodes a variable into numerical values using the provided mapping.
 
-        Args:
+        Parameters:
             column (str): The name of the column to be encoded.
             mapping (dict): The mapping of categorical values to numerical values.
         """
@@ -287,7 +302,7 @@ class DataCleaning:
     """
     A class for performing data cleaning operations on a dataset.
 
-    Args:
+    Parameters:
         data_loader (DataLoader): An instance of the DataLoader class that provides access to the dataset.
 
     Attributes:
@@ -303,7 +318,7 @@ class DataCleaning:
         """
         Initializes an instance of the class.
 
-        Args:
+        Parameters:
             data_loader: The data loader object used to load the dataset.
 
         Returns:
@@ -326,9 +341,9 @@ class DataCleaning:
 
     def remove_duplicates(self):
         """
-            This method checks for duplicate rows in the dataset and removes them if any are found.
-            It prints the number of duplicate rows before and after the removal process.
-            """
+        This method checks for duplicate rows in the dataset and removes them if any are found.
+        It prints the number of duplicate rows before and after the removal process.
+        """
         print("Duplicate Rows:", self.data_loader.data.duplicated().sum())
 
         if self.data_loader.data.duplicated().sum() > 0:
@@ -376,7 +391,7 @@ class DataVisualization:
     """
     A class for visualizing data using various plot types.
     
-    Args:
+    Parameters:
         data_loader (DataLoader): A DataLoader object that provides access to the data.
         valid_plot_types (list): A list of valid plot types that can be used for visualization.
     
@@ -489,7 +504,7 @@ class DataVisualization:
 
             # Calculate permutation importance
             result = permutation_importance(clf, X, y, n_repeats=10, random_state=42, n_jobs=-1)
-            perm_sorted_idx = result.importances_mean.argsort()
+            perm_sorted_idx = result.importances_mean.Parametersort()
 
             # Visualize feature importance
             plt.figure(figsize=(10, 8))
@@ -504,7 +519,7 @@ class DimensionalityReduction:
     """
     Class for performing dimensionality reduction techniques such as PCA and UMAP.
 
-    Args:
+    Parameters:
         data_loader (DataLoader): An instance of the DataLoader class that provides the data.
 
     Attributes:
@@ -544,7 +559,7 @@ class DimensionalityReduction:
         """
         Plot the projection of the data.
 
-        Args:
+        Parameters:
         - projection: The projected data.
         - title (str): The title of the plot.
         """
@@ -563,7 +578,7 @@ class DimensionalityReduction:
         """
         Perform Principal Component Analysis (PCA) on the data.
 
-        Args:
+        Parameters:
         - n_components: The number of components to keep.
 
         Returns:
@@ -575,7 +590,7 @@ class DimensionalityReduction:
         """
         Perform Uniform Manifold Approximation and Projection (UMAP) on the data.
 
-        Args:
+        Parameters:
         - n_components: The number of components to keep.
         - n_neighbors: The number of neighbors to consider for each point.
         - min_dist: The minimum distance between points in the low-dimensional representation.
@@ -867,7 +882,7 @@ class FeatureCreation:
     """
     A class that contains methods to create various features based on the data_loader object.
 
-    Args:
+    Parameters:
         data_loader (object): An object that loads the data.
 
     Attributes:
@@ -893,7 +908,7 @@ class FeatureCreation:
         """
         Initialize the class with a data loader.
 
-        Args:
+        Parameters:
             data_loader: The data loader object used to load data.
         """
         self.data_loader = data_loader
@@ -1058,19 +1073,63 @@ class FeatureCreation:
 
 
 class KNearestNeighbors:
+    """
+    K-Nearest Neighbors classifier.
+    
+    Parameters:
+        - k (int): Number of neighbors to consider.
+        - radius (float): Radius for radius search. Default is 30.
+    
+    Attributes:
+        - k (int): Number of neighbors to consider.
+        - radius (float): Radius for radius search.
+        - nbrs (object): NearestNeighbors object.
+        - y_train (array-like): Training labels.
+        
+    Methods:
+        - fit(X_train, y_train): Fit the model to the training data.
+        - score(X_val, y_val): Calculate the accuracy of the model on the validation data.
+        - predict(X_val): Predict the labels for the validation data.
+    """
     def __init__(self, k, radius=30):
+        """
+        Initialize the KNearestNeighbors object.
+        
+        Parameters:
+            - k (int): Number of neighbors to consider.
+            - radius (float): Radius for radius search. Default is 30.
+        """
         self.k = k
         self.radius = radius
         self.nbrs = None
         self.y_train = None
 
     def fit(self, X_train, y_train):
+        """
+        Fit the model to the training data.
+
+        Parameters:
+            - X_train (array-like): Training data.
+            - y_train (array-like): Training labels.
+        """
         # Initialize NearestNeighbors object with algorithm='ball_tree' for efficient nearest neighbor search
         self.nbrs = NearestNeighbors(n_neighbors=self.k, algorithm='ball_tree').fit(X_train)
         self.y_train = y_train
 
     def score(self, X_val, y_val):
+        """
+        Calculate the accuracy of the model on the validation data.
 
+        Parameters:
+            - X_val (array-like): Validation data.
+            - y_val (array-like): Validation labels.
+
+        Returns:
+            - float: Accuracy of the model on the validation data.
+
+        Raises:
+            - ValueError: If the model has not been trained yet.
+        """
         if self.nbrs is None:
             raise ValueError("Model has not been trained yet. Please call fit() before score().")
 
@@ -1095,11 +1154,21 @@ class KNearestNeighbors:
                 correct_counts += 1
 
         accuracy = correct_counts / total_counts  # Calculate accuracy
-        print(self.radius)
         return accuracy
 
     def predict(self, X_val):
+        """
+        Predict the labels for the validation data.
 
+        Parameters:
+            - X_val (array-like): Validation data.
+
+        Returns:
+            - array: Predicted labels for the validation data.
+
+        Raises:
+            - ValueError: If the model has not been trained yet.
+        """
         if self.nbrs is None:
             raise ValueError("Model has not been trained yet. Please call fit() before predict().")
 
@@ -1120,7 +1189,7 @@ class KNearestNeighbors:
 
             predicted_label = np.bincount(neighbor_labels).argmax()  # Predict label based on majority vote
             y_pred.append(predicted_label)
-        print(self.radius)
+
         return np.array(y_pred)
 
 
@@ -1135,6 +1204,10 @@ class ModelOptimization:
         - y_val (array-like): Validation labels.
 
     Attributes:
+        - X_train (array-like): Training data.
+        - y_train (array-like): Training labels.
+        - X_val (array-like): Validation data.
+        - y_val (array-like): Validation labels.
 
     Methods:
         optimize_knn: Optimizes the parameters for K-Nearest Neighbors classifier.
@@ -1144,6 +1217,21 @@ class ModelOptimization:
     """
 
     def __init__(self, X_train, y_train, X_val, y_val):
+        """
+        Initialize the ModelOptimization object.
+
+        Parameters:
+            - X_train (array-like): Training data.
+            - y_train (array-like): Training labels.
+            - X_val (array-like): Validation data.
+            - y_val (array-like): Validation labels.
+
+        Attributes:
+            - X_train (array-like): Training data.
+            - y_train (array-like): Training labels.
+            - X_val (array-like): Validation data.
+            - y_val (array-like): Validation labels.
+        """
 
         self.X_train = X_train
         self.y_train = y_train
@@ -1167,12 +1255,11 @@ class ModelOptimization:
         for k in k_values:
 
             knn = KNearestNeighbors(k)
-            #knn = KNeighborsClassifier(n_neighbors=k)
-            knn.fit(self.X_train, self.y_train)
-            accuracy = knn.score(self.X_val, self.y_val)
-            print(f"k = {k}, Accuracy = {accuracy}")
+            knn.fit(self.X_train, self.y_train)  # Fit the model to the training data
+            accuracy = knn.score(self.X_val, self.y_val)  # Calculate the accuracy on the validation data
+            print(f"k = {k}, Accuracy = {accuracy}")  # Print the accuracy for the current k value
 
-            if accuracy > best_accuracy:
+            if accuracy > best_accuracy:  # Update the best k value if the accuracy is higher
                 best_accuracy = accuracy
                 best_k = k
 
@@ -1199,12 +1286,12 @@ class ModelOptimization:
             for penalty_selected in penalty:
 
                 lr = LogisticRegression(C=c, penalty=penalty_selected, solver='saga', multi_class='auto', max_iter=1000)
-                lr.fit(self.X_train, self.y_train)
-                accuracy = lr.score(self.X_val, self.y_val)
+                lr.fit(self.X_train, self.y_train)  # Fit the model to the training data
+                accuracy = lr.score(self.X_val, self.y_val)  # Calculate the accuracy on the validation data
 
                 print(f"C = {c}, Penalty = {penalty_selected}, Accuracy = {accuracy}")
 
-                if accuracy > best_accuracy:
+                if accuracy > best_accuracy:  # Update the best parameters if the accuracy is higher
                     best_accuracy = accuracy
                     best_c = c
                     best_penalty = penalty_selected
@@ -1227,15 +1314,15 @@ class ModelOptimization:
         best_accuracy = -1
         best_max_depth = None
 
-        for max_depth in max_depth_values:
+        for max_depth in max_depth_values:  # Iterate over the max depth values
 
             dt = DecisionTreeClassifier(max_depth=max_depth)
-            dt.fit(self.X_train, self.y_train)
-            accuracy = dt.score(self.X_val, self.y_val)
+            dt.fit(self.X_train, self.y_train)  # Fit the model to the training data
+            accuracy = dt.score(self.X_val, self.y_val)  # Calculate the accuracy on the validation data
 
             print(f"Max depth = {max_depth}, Accuracy = {accuracy}")
 
-            if accuracy > best_accuracy:
+            if accuracy > best_accuracy:  # Update the best max depth value if the accuracy is higher
                 best_accuracy = accuracy
                 best_max_depth = max_depth
 
@@ -1258,7 +1345,7 @@ class ModelOptimization:
         """
         # Initialize the population
         population = []
-
+        # Generate random individuals
         for _ in range(population_size):
 
             neurons = random.randint(*layer_range)
@@ -1269,19 +1356,19 @@ class ModelOptimization:
         for generation in range(max_generations):
 
             print(f"Generation {generation + 1}/{max_generations}")
-            new_population = []
-            for i, (neurons, activation_selected) in enumerate(population):
+            new_population = []  # Initialize the new population
+            for i, (neurons, activation_selected) in enumerate(population):  # Iterate over the population
 
                 # Skip the first iteration from generation 1 onwards since it is the best elements foun on the previous iteration
                 if generation != 0 and i == 0:
                     new_population.append((best_params, best_accuracy))
                     continue
 
-                print("Generation ", generation, " element ", i)
+                print("Generation ", generation, " element ", i)  # Print the generation and element number
                 mlp = MLPClassifier(hidden_layer_sizes=(neurons,), activation=activation_selected, early_stopping=True)
-                mlp.fit(self.X_train, self.y_train)
-                accuracy = mlp.score(self.X_val, self.y_val)
-                new_population.append(((neurons, activation_selected), accuracy))
+                mlp.fit(self.X_train, self.y_train)  # Fit the model to the training data
+                accuracy = mlp.score(self.X_val, self.y_val)  # Calculate the accuracy on the validation data
+                new_population.append(((neurons, activation_selected), accuracy))  # Add the individual to the new population
                 print(f"Neurons: {neurons}, activation: {activation_selected}, Accuracy: {accuracy}")
 
             new_population.sort(key=lambda x: x[1], reverse=True)
@@ -1331,6 +1418,20 @@ class CrossValidator:
     """
 
     def __init__(self, k=5):
+        """
+        Initialize the CrossValidator object.
+
+        Parameters:
+            k (int): Number of folds for cross-validation. Default is 5.
+
+        Attributes:
+            k (int): Number of folds for cross-validation.
+            kf (object): KFold object for splitting the data.
+            cm (object): ConfusionMatrix object for calculating confusion matrix.
+            accuracy_scores (list): List of accuracy scores for each fold.
+            sensitivity_scores (list): List of sensitivity scores for each fold.
+            specificity_scores (list): List of specificity scores for each fold.
+        """
 
         self.k = k
         self.kf = KFold(n_splits=k, shuffle=True)
@@ -1352,12 +1453,12 @@ class CrossValidator:
             tuple: Average accuracy, sensitivity, and specificity scores.
         """
 
-        for train_index, val_index in self.kf.split(X):
+        for train_index, val_index in self.kf.split(X):  # Split the data into training and validation sets
             X_train, X_val = X[train_index], X[val_index]
             y_train, y_val = y[train_index], y[val_index]
 
-            model.fit(X_train, y_train)
-            y_pred = model.predict(X_val)
+            model.fit(X_train, y_train)  # Fit the model to the training data
+            y_pred = model.predict(X_val)  # Predict the labels for the validation data
 
             self.cm = ConfusionMatrix(actual_vector=list(y_val), predict_vector=list(y_pred))
 
@@ -1383,6 +1484,7 @@ class CrossValidator:
         Returns:
             tuple: Accuracy, sensitivity, and specificity scores on the test set.
         """
+
         y_pred = model.predict(X_test)
         cm = ConfusionMatrix(actual_vector=list(y_test), predict_vector=list(y_pred))
         accuracy = cm.Overall_ACC
@@ -1428,6 +1530,35 @@ class ModelBuilding:
     """
 
     def __init__(self, X_train, y_train, X_test, y_test, X_val, y_val, k=5, save_all=True):
+        """
+        Initialize the ModelBuilding object.
+
+        Parameters:
+            X_train (array-like): Training data.
+            y_train (array-like): Training labels.
+            X_test (array-like): Test data.
+            y_test (array-like): Test labels.
+            X_val (array-like): Validation data.
+            y_val (array-like): Validation labels.
+            k (int): Number of folds for cross-validation. Default is 5.
+            save_all (bool): Flag to save all models. Default is True.
+
+        Attributes:
+            X_train (array-like): Training data.
+            y_train (array-like): Training labels.
+            X_test (array-like): Test data.
+            y_test (array-like): Test labels.
+            X_val (array-like): Validation data.
+            y_val (array-like): Validation labels.
+            k (int): Number of folds for cross-validation.
+            save_all (bool): Flag to save all models.
+            best_model (object): Best performing model.
+            best_model_name (str): Name of the best performing model.
+            best_params (tuple): Best parameters for the best performing model.
+            best_score (float): Best validation score.
+            best_model_changed (bool): Flag to track if the best model changed.
+            history (dict): Dictionary to store the validation scores of all models.
+        """
 
         self.X_train = X_train
         self.y_train = y_train
@@ -1444,43 +1575,41 @@ class ModelBuilding:
         self.best_model_changed = False
         self.history = {}
 
-    def build_models(self, model_name, models_dict):
+    def build_models(self, model_name, models_dict, results_dict):
         """
         Builds, optimizes and evaluates machine learning models.
 
         Parameters:
             model_name (str): Name of the model to build.
             models_dict (dict): Dictionary containing the models to build.
+            results_dict (dict): Dictionary to store the results of the models.
 
-        Returns:
-            dict: History of validation scores for all models.
-            float: Average accuracy during cross-validation.
-            float: Average sensitivity during cross-validation.
-            float: Average specificity during cross-validation.
+        Raises:
+            ValueError: If the model type is not supported.
         """
 
         model_optimization = ModelOptimization(self.X_train, self.y_train, self.X_val, self.y_val)
         print("\nTraining", model_name, "model")
-        for name, model_params in models_dict.items():
+        for name, model_params in models_dict.items():  # Iterate over the models
             if model_name != name:
                 continue
             model = model_params.pop('model')
             model_params_check = {}
 
-            if model_name == "KNN":
+            if model_name == "KNN":  # Optimize the parameters for K-Nearest Neighbors
                 k = model_optimization.optimize_knn(model_params['k'])
                 model_params_check['k'] = k
                 params = {'k': k}
-            elif model_name == "LogisticRegression":
+            elif model_name == "LogisticRegression":  # Optimize the parameters for Logistic Regression
                 lr_params = model_optimization.optimize_logistic_regression(**model_params)
                 model_params_check['C'] = lr_params[0]
                 model_params_check['penalty'] = lr_params[1]
                 params = lr_params
-            elif model_name == "DecisionTree":
+            elif model_name == "DecisionTree":  # Optimize the parameters for Decision Tree
                 dt_params = model_optimization.optimize_decision_tree(**model_params)
                 model_params_check['max_depth'] = dt_params
                 params = dt_params
-            elif model_name == "MLP":
+            elif model_name == "MLP":  # Optimize the parameters for Multi-layer Perceptron (MLP)
                 mlp_params = model_optimization.optimize_mlp(**model_params)
                 model_params_check['hidden_layer_sizes'] = (mlp_params[0],)
                 model_params_check['activation'] = mlp_params[1]
@@ -1488,12 +1617,12 @@ class ModelBuilding:
             else:
                 raise ValueError("Model type is not supported.")
 
-            model_instance = model(**model_params_check)
-            model_instance.fit(self.X_train, self.y_train)
-            val_score = model_instance.score(self.X_val, self.y_val)
-            self.history[str(name)] = val_score
+            model_instance = model(**model_params_check)  # Create an instance of the model with the optimized parameters
+            model_instance.fit(self.X_train, self.y_train)  # Fit the model to the training data
+            val_score = model_instance.score(self.X_val, self.y_val)  # Calculate the accuracy on the validation data
+            self.history[str(name)] = val_score  # Store the validation score in the history dictionary
 
-            if val_score > self.best_score:
+            if val_score > self.best_score:  # Update the best model if the validation score is higher
                 print("\nNew best model found!")
                 self.best_score = val_score
                 self.best_model = model_instance
@@ -1505,14 +1634,14 @@ class ModelBuilding:
             else:
                 self.best_model_changed = False  # Reset flag if the best model didn't change
 
-            if self.save_all:
+            if self.save_all:  # Save all models if the flag is set
                 self.save_model(model_instance, name)
 
         self.kf_cv = CrossValidator(k=self.k)
 
-        # Performing cross-validation on the model
         print(f"\nPreforming cross-validation on the {model_name} model:")
 
+        # Performance of the model during cross-validation
         avg_accuracy_cv, avg_sensitivity_cv, avg_specificity_cv = self.kf_cv.cross_validate(model_instance,
                                                                                             self.X_train, self.y_train)
 
@@ -1520,24 +1649,30 @@ class ModelBuilding:
         print("Average sensitivity during cross-validation:", avg_sensitivity_cv)
         print(f"Average specificity during cross-validation: {avg_specificity_cv}\n")
 
-        # Performance of the model on the test set
         print(f"\nPerformance of the {model_name} model on the Test set:")
 
+        # Performance of the model on the test set
         accuracy_test, sensitivity_test, specificity_test = self.kf_cv.evaluate_on_test_set(model_instance, self.X_test,
                                                                                             self.y_test)
         print("Test set accuracy:", accuracy_test)
         print("Test set sensitivity:", sensitivity_test)
         print(f"Test set specificity: {specificity_test}\n")
 
+        # Store the results in the results dictionary
+        results_dict[model_name]['Accuracy'] = float(accuracy_test)
+        results_dict[model_name]['Sensitivity'] = float(sensitivity_test)
+        results_dict[model_name]['Specificity'] = float(specificity_test)
+
+        # Print the best model and its parameters
         print("\nOptimization finished, history:\n")
-        print("Model name\t\tAccuracy")  # Print header
-        for model, accuracy in self.history.items():  # Print table rows
+        print("Model name\t\tAccuracy")
+        for model, accuracy in self.history.items():
             print(f"{model}\t\t{accuracy}")
         print("\nBest performing model:", self.best_model_name)
         print("Best validation score:", self.best_score)
         print("Best parameters:", self.best_params)
 
-        if not self.save_all:
+        if not self.save_all:  # Save the best model if the flag is not set
             self.save_model(self.best_model, self.best_model_name)
 
     def save_model(self, model, filename):
@@ -1560,7 +1695,7 @@ class BaggingClassifier:
     A class for implementing the Bagging ensemble method with a base model.
 
     Parameters:
-        base_model: Base machine learning model to use for bagging.
+        base_model: Base machine learning model to use for bagging (Best Model).
         X_train (array-like): Training features.
         y_train (array-like): Training labels.
         X_test (array-like): Test features.
@@ -1661,21 +1796,24 @@ class BaggingClassifier:
         final_predictions = np.apply_along_axis(lambda x: np.bincount(x.astype(int)).argmax(), axis=1, arr=predictions)
         return final_predictions
 
-    def evaluate(self):
+    def evaluate(self, results_dict):
         """
         Evaluates the bagging ensemble on test data.
 
-        Returns:
-            tuple: Average accuracy, sensitivity, and specificity scores.
+        Parameters:
+            results_dict (dict): Dictionary to store the results of the models.
         """
         self.y_pred = self.predict(self.X_test)
         self.cm = ConfusionMatrix(actual_vector=list(self.y_test), predict_vector=list(self.y_pred))
         self.accuracy_scores = accuracy_score(self.y_test, self.y_pred)
         self.sensitivity_scores = float(self.cm.TPR_Macro)
         self.specificity_scores = float(self.cm.TNR_Macro)
-        print(
-            f"Accuracy: {self.accuracy_scores}, Sensitivity: {self.sensitivity_scores}, Specificity: {self.specificity_scores}")
-        return self.accuracy_scores, self.sensitivity_scores, self.specificity_scores
+
+        results_dict['Bagging']['Accuracy'] = float(self.accuracy_scores)
+        results_dict['Bagging']['Sensitivity'] = float(self.sensitivity_scores)
+        results_dict['Bagging']['Specificity'] = float(self.specificity_scores)
+
+        print(f"Accuracy: {self.accuracy_scores}, Sensitivity: {self.sensitivity_scores}, Specificity: {self.specificity_scores}")
 
 
 class AdaBoostClassifier:
@@ -1768,6 +1906,7 @@ class AdaBoostClassifier:
                 else:
                     raise ValueError("Best model not found.")
 
+                # Train the model
                 base_model.fit(self.X_train[train_index], self.y_train[train_index], sample_weight=w)
 
                 print("Examining model")
@@ -1821,9 +1960,12 @@ class AdaBoostClassifier:
         final_predictions = np.argmax(predictions, axis=1)
         return final_predictions
 
-    def evaluate(self):
+    def evaluate(self, results_dict):
         """
         Evaluates the AdaBoost ensemble on test data.
+
+        Parameters:
+            results_dict (dict): Dictionary to store the results of the models.
 
         Returns:
             float: Accuracy score.
@@ -1837,9 +1979,26 @@ class AdaBoostClassifier:
                 temp_predictions[i, int(pred)] += alpha
             predictions += temp_predictions
         final_predictions = np.argmax(predictions, axis=1)
-        self.accuracy_scores = accuracy_score(self.y_test, final_predictions)
-        print(f"\nEvaluated Accuracy: {self.accuracy_scores}")
-        return self.accuracy_scores
+
+        # Calculate confusion matrix
+        cm = ConfusionMatrix(actual_vector=list(self.y_test), predict_vector=list(final_predictions))
+        sensitivity_boost = cm.TPR_Macro
+        specificity_boost = cm.TNR_Macro
+
+        # Calculated accuracy
+        accuracy_boost = accuracy_score(self.y_test, final_predictions)
+        print(f"\nTest Accuracy: {self.accuracy_scores}")
+
+        # Calculated sensitivity
+        print(f"Test Sensitivity: {sensitivity_boost}")
+
+        # Calculated specificity
+        print(f"Test Specificity: {specificity_boost}\n")
+
+        # Store the results in the results dictionary
+        results_dict['AdaBoost']['Accuracy'] = float(accuracy_boost)
+        results_dict['AdaBoost']['Sensitivity'] = float(sensitivity_boost)
+        results_dict['AdaBoost']['Specificity'] = float(specificity_boost)
 
 
 class CNN:
@@ -1878,7 +2037,34 @@ class CNN:
     """
 
     def __init__(self, X_train, y_train, X_test, y_test, X_val, y_val, input_shape, num_classes, epochs=10, batch_size=32):
+        """
+        Initialize the CNN object.
 
+        Parameters:
+            X_train (array-like): Training data.
+            y_train (array-like): Training labels.
+            X_test (array-like): Test data.
+            y_test (array-like): Test labels.
+            X_val (array-like): Validation data.
+            y_val (array-like): Validation labels.
+            input_shape (tuple): Shape of the input data.
+            num_classes (int): Number of classes.
+            epochs (int): Number of epochs. Default is 10.
+            batch_size (int): Batch size. Default is 32.
+
+        Attributes:
+            X_train (array-like): Training data.
+            y_train (array-like): Training labels.
+            X_test (array-like): Test data.
+            y_test (array-like): Test labels.
+            X_val (array-like): Validation data.
+            y_val (array-like): Validation labels.
+            input_shape (tuple): Shape of the input data.
+            num_classes (int): Number of classes.
+            epochs (int): Number of epochs.
+            batch_size (int): Batch size.
+            model (object): CNN model.
+        """
         self.X_train, self.y_train = X_train, y_train
         self.X_test, self.y_test = X_test, y_test
         self.X_val, self.y_val = X_val, y_val
@@ -1896,6 +2082,7 @@ class CNN:
             object: CNN model.
         """
 
+        # Define the CNN model
         model = Sequential([
             Conv1D(filters=32, kernel_size=3, activation='relu', input_shape=(self.input_shape[0], 1)),
             MaxPooling1D(pool_size=2),
@@ -1904,9 +2091,10 @@ class CNN:
             LSTM(64, return_sequences=True),
             Flatten(),
             Dense(64, activation='relu'),
-            Dense(1, activation='sigmoid')  # 1 porque estamos a fazer classificação binária
+            Dense(1, activation='sigmoid')
         ])
 
+        # Compile the model
         model.compile(optimizer='adam',
                       loss='binary_crossentropy',
                       metrics=['accuracy'])
@@ -1925,28 +2113,58 @@ class CNN:
         y_train = self.y_train.squeeze()
         y_val = self.y_val.squeeze()
 
+        # Fit the model to the training data and validate on the validation data
         history = self.model.fit(self.X_train, y_train, batch_size=self.batch_size, epochs=self.epochs,
                                  verbose=1, validation_data=(self.X_val, y_val))
         return history
 
-    def evaluate(self):
+    def evaluate(self, results_dict):
         """
         Evaluates the CNN model.
 
-        Returns:
-            list: Scores of the model.
+        Parameters:
+            results_dict (dict): Dictionary to store the results of the models.
         """
 
         # Ensure target labels are one-dimensional
         y_test = self.y_test.squeeze()
 
-        scores = self.model.evaluate(self.X_test, y_test, verbose=0)
-        return scores
+        # Get raw predictions from the model
+        y_pred_prob = self.model.predict(self.X_test)
+
+        # Convert probabilities to class labels using a threshold (e.g., 0.5)
+        y_pred = (y_pred_prob > 0.5).astype(int)
+
+        # Calculate confusion matrix
+        cm = confusion_matrix(y_test, y_pred)
+
+        # Calculate accuracy
+        accuracy = accuracy_score(y_test, y_pred)
+
+        # Calculate sensitivity
+        sensitivity = cm[1, 1] / (cm[1, 1] + cm[1, 0])
+
+        # Calculate specificity
+        specificity = cm[0, 0] / (cm[0, 0] + cm[0, 1])
+
+        # Store the results in the results dictionary
+        results_dict['CNN']['Accuracy'] = float(accuracy)
+        results_dict['CNN']['Sensitivity'] = float(sensitivity)
+        results_dict['CNN']['Specificity'] = float(specificity)
+
+        print("\nCNN Accuracy:", accuracy)
+        print("CNN Sensitivity:", sensitivity)
+        print("CNN Specificity:", specificity)
 
 
 class ClusteringModel:
     """
     A class to perform various clustering algorithms and visualize their results.
+
+    Parameters:
+        data_train (DataFrame): The training dataset.
+        data_test (DataFrame): The testing dataset.
+        n_clusters (int): The number of clusters to form.
 
     Attributes:
         data_train (DataFrame): The training dataset.
@@ -1956,30 +2174,31 @@ class ClusteringModel:
         test_labels (array): Labels generated by clustering algorithms for testing data.
 
     Methods:
-        __init__(self, data_train, data_test, n_clusters):
-            Initializes ClusteringModel with the provided datasets and number of clusters.
-
-        hierarchical_clustering(self):
-            Performs hierarchical clustering and visualizes the dendrogram.
-
-        k_means(self):
-            Performs K-Means clustering and visualizes the clusters.
-
-        gaussian_mixture_model(self):
-            Performs Gaussian Mixture Model clustering and visualizes the clusters.
-
-        optics(self):
-            Performs OPTICS clustering and visualizes the clusters.
-
-        plot_clusters(self, data, labels):
-            Plots clusters in 2D using Principal Component Analysis.
-
-        perform_clustering(self):
-            Performs all clustering methods and visualizes their results.
-
+        hierarchical_clustering: Performs hierarchical clustering and visualizes the dendrogram.
+        k_means: Performs K-Means clustering and visualizes the clusters.
+        gaussian_mixture_model: Performs Gaussian Mixture Model clustering and visualizes the clusters.
+        optics: Performs OPTICS clustering and visualizes the clusters.
+        plot_clusters: Plots clusters in 2D using Principal Component Analysis.
+        perform_clustering: Performs all clustering methods and visualizes their results.
     """
 
     def __init__(self, data_train, data_test, n_clusters):
+        """
+        Initialize the ClusteringModel object.
+
+        Parameters:
+            data_train (DataFrame): The training dataset.
+            data_test (DataFrame): The testing dataset.
+            n_clusters (int): The number of clusters to form.
+
+        Attributes:
+            data_train (DataFrame): The training dataset.
+            data_test (DataFrame): The testing dataset.
+            n_clusters (int): The number of clusters to form.
+            train_labels (array): Labels generated by clustering algorithms for training data.
+            test_labels (array): Labels generated by clustering algorithms for testing data.
+        """
+
         self.data_train = data_train
         self.data_test = data_test
         self.n_clusters = n_clusters
@@ -1987,9 +2206,14 @@ class ClusteringModel:
         self.test_labels = None
 
     def hierarchical_clustering(self):
+        """
+        Performs hierarchical clustering and visualizes the dendrogram.
+        This method performs hierarchical clustering on a random sample of the training data and visualizes the dendrogram.
+        """
+
         print("\nHierarchical Clustering:")
-        # Random sample 1% (we have too much data to compute efficiently so we need to reduce it)
-        random_sample = self.data_test.sample(n=int(0.01 * len(self.data_test)), replace=False)
+        # Only use 50% of the data for visualization because of the large size
+        random_sample = self.data_test.sample(n=int(0.5 * len(self.data_test)), replace=False)
         # Plot dendrogram
         sch.dendrogram(sch.linkage(random_sample, method='ward'), color_threshold=30)
         plt.title('Dendrogram')
@@ -1998,6 +2222,11 @@ class ClusteringModel:
         plt.show()
 
     def k_means(self):
+        """
+        Performs K-Means clustering and visualizes the clusters.
+        This method performs K-Means clustering on the testing data and visualizes the clusters in 2D.
+        """
+
         print("\nK-Means Clustering:")
         kmeans = KMeans(n_clusters=self.n_clusters)
         kmeans.fit_predict(self.data_train)
@@ -2005,24 +2234,41 @@ class ClusteringModel:
         self.plot_clusters(self.data_test, self.test_labels)
 
     def gaussian_mixture_model(self):
+        """
+        Performs Gaussian Mixture Model clustering and visualizes the clusters.
+        This method performs Gaussian Mixture Model clustering on the testing data and visualizes the clusters in 2D.
+        """
+
         print("\nGaussian Mixture Model:")
-        # Random sample 1% (we have too much data to compute efficiently so we need to reduce it)
-        random_sample = self.data_train.sample(n=int(0.01 * len(self.data_train)), replace=False)
+        # Only use 50% of the data for visualization because of the large size
+        random_sample = self.data_train.sample(n=int(0.5 * len(self.data_train)), replace=False)
         gmm = GaussianMixture(n_components=self.n_clusters)
         gmm.fit_predict(random_sample)
         self.test_labels = gmm.predict(self.data_test)
         self.plot_clusters(self.data_test, self.test_labels)
 
     def optics(self):
+        """
+        Performs OPTICS clustering and visualizes the clusters.
+        This method performs OPTICS clustering on the testing data and visualizes the clusters in 2D.
+        """
+
         print("\nOPTICS Clustering:")
-        # Random sample 10% (we have too much data to compute efficiently so we need to reduce it)
-        random_sample = self.data_test.sample(n=int(0.1 * len(self.data_test)), replace=False)
+        # Only use 50% of the data for visualization because of the large size
+        random_sample = self.data_test.sample(n=int(0.5 * len(self.data_test)), replace=False)
         optics = OPTICS(min_samples=3)
         self.test_labels = optics.fit(random_sample)
         self.plot_clusters(random_sample, self.test_labels.labels_)
 
     def plot_clusters(self, data, labels):
-        # Perform PCA
+        """
+        Plots clusters in 2D using Principal Component Analysis.
+
+        Parameters:
+            data (array): The data to plot.
+            labels (array): The labels of the clusters.
+        """
+
         pca = PCA(n_components=2)
         data_pca = pca.fit_transform(data)
 
@@ -2034,10 +2280,239 @@ class ClusteringModel:
         plt.show()
 
     def perform_clustering(self):
+        """
+        Performs all clustering methods and visualizes their results.
+        """
+
         self.hierarchical_clustering()
         self.k_means()
         self.gaussian_mixture_model()
         self.optics()
+
+
+class BestFeatureSelector:
+    """
+    A class to perform feature selection using Sequential Backward Feature Selection.
+
+    Parameters:
+        X_train (DataFrame): Training data.
+        y_train (array): Training labels.
+        X_test (DataFrame): Test data.
+        y_test (array): Test labels.
+        X_val (DataFrame): Validation data.
+        y_val (array): Validation labels.
+        base_model: Base machine learning model to use for feature selection.
+
+    Attributes:
+        X_train (DataFrame): Training data.
+        y_train (array): Training labels.
+        X_val (DataFrame): Validation data.
+        y_val (array): Validation labels.
+        X_test (DataFrame): Test data.
+        y_test (array): Test labels.
+        base_model: Base machine learning model to use for feature selection.
+        selected_features_idx (array): Indices of the selected features.
+    """
+
+    def __init__(self, X_train, y_train, X_test, y_test, X_val, y_val, base_model):
+        """
+        Initialize the BestFeatureSelector object.
+
+        Parameters:
+            X_train (DataFrame): Training data.
+            y_train (array): Training labels.
+            X_test (DataFrame): Test data.
+            y_test (array): Test labels.
+            X_val (DataFrame): Validation data.
+            y_val (array): Validation labels.
+            base_model: Base machine learning model to use for feature selection.
+
+        Attributes:
+            X_train (DataFrame): Training data.
+            y_train (array): Training labels.
+            X_val (DataFrame): Validation data.
+            y_val (array): Validation labels.
+            X_test (DataFrame): Test data.
+            y_test (array): Test labels.
+            base_model: Base machine learning model to use for feature selection.
+            selected_features_idx (array): Indices of the selected features.
+        """
+
+        self.X_train = X_train
+        self.y_train = y_train
+        self.X_val = X_val
+        self.y_val = y_val
+        self.X_test = X_test
+        self.y_test = y_test
+        self.base_model = base_model
+        self.selected_features_idx = None
+
+    def select_features(self):
+        """
+        Perform sequential backward feature selection.
+
+        This method selects the best set of features using backward feature selection.
+        """
+        # Define the Sequential Feature Selector
+        sfs = SequentialFeatureSelector(self.base_model, k_features='best', forward=False, floating=False,
+                                        scoring='accuracy', verbose=True, n_jobs=8, cv=2)
+
+        # Perform Sequential Backward Feature Selection
+        sfs = sfs.fit(self.X_train, self.y_train)
+
+        # Get the selected feature indices
+        self.selected_features_idx = sfs.k_feature_idx_
+
+    def evaluate(self, results_dict):
+        """
+        Evaluate the best model with the selected features.
+        This method evaluates the best model using the selected features on the test set.
+
+        Parameters:
+            results_dict (dict): Dictionary to store the results of the models.
+        """
+
+        X_train_selected = self.X_train.iloc[:, list(self.selected_features_idx)]
+        X_train_selected = X_train_selected.values
+
+        X_test_selected = self.X_test.iloc[:, list(self.selected_features_idx)]
+        X_test_selected = X_test_selected.values
+
+        # Train the model with the selected features
+        clf = self.base_model.fit(X_train_selected, self.y_train)
+
+        # Predictions on test set
+        y_test_pred = clf.predict(X_test_selected)
+
+        # Calculate confusion matrix
+        cm = confusion_matrix(self.y_test, y_test_pred)
+
+        # Calculate accuracy
+        accuracy = accuracy_score(self.y_test, y_test_pred)
+
+        # Calculate sensitivity
+        sensitivity = cm[1, 1] / (cm[1, 1] + cm[1, 0])
+
+        # Calculate specificity
+        specificity = cm[0, 0] / (cm[0, 0] + cm[0, 1])
+
+        # Store the results in the results dictionary
+        results_dict['FeatureSelection']['Accuracy'] = float(accuracy)
+        results_dict['FeatureSelection']['Sensitivity'] = float(sensitivity)
+        results_dict['FeatureSelection']['Specificity'] = float(specificity)
+
+        print(f"\nFeature Selection Accuracy: {accuracy}")
+        print(f"Feature Selection Sensitivity: {sensitivity}")
+        print(f"Feature Selection Specificity: {specificity}")
+
+
+class DataDemonstration:
+    """
+    A class to demonstrate the results of the models.
+
+    Parameters:
+        results_dict (dict): Dictionary containing the results of the models.
+
+    Attributes:
+        data_results (dict): Dictionary containing the results of the models.
+        data_specifications (dict): Dictionary containing the specifications of the models.
+        df_results (DataFrame): DataFrame containing the results of the models.
+        df_specifications (DataFrame): DataFrame containing the specifications of the models.
+    """
+
+    def __init__(self, results_dict):
+        """
+        Initialize the DataDemonstration object.
+
+        Parameters:
+            results_dict (dict): Dictionary containing the results of the models.
+
+        Attributes:
+            data_results (dict): Dictionary containing the results of the models.
+            data_specifications (dict): Dictionary containing the specifications of the models.
+            df_results (DataFrame): DataFrame containing the results of the models.
+            df_specifications (DataFrame): DataFrame containing the specifications of the models.
+        """
+
+        self.data_results = {
+            'Model': ['Model A', 'Model B', 'Model C', 'Model D', 'Model E', 'Model F', 'Model G', 'Model H'],
+            'Category': ['All Models', 'Supervised Learning', 'Supervised Learning', 'Supervised Learning', 'Bagging',
+                         'Boosting', 'Deep Learning', 'Feature Selection'],
+            'Accuracy': [results_dict['KNN']['Accuracy'], results_dict['LogisticRegression']['Accuracy'],
+                         results_dict['DecisionTree']['Accuracy'], results_dict['MLP']['Accuracy'],
+                         results_dict['Bagging']['Accuracy'], results_dict['AdaBoost']['Accuracy'],
+                         results_dict['CNN']['Accuracy'], results_dict['FeatureSelection']['Accuracy']],
+            'Sensitivity': [results_dict['KNN']['Sensitivity'], results_dict['LogisticRegression']['Sensitivity'],
+                            results_dict['DecisionTree']['Sensitivity'], results_dict['MLP']['Sensitivity'],
+                            results_dict['Bagging']['Sensitivity'], results_dict['AdaBoost']['Sensitivity'],
+                            results_dict['CNN']['Sensitivity'], results_dict['FeatureSelection']['Sensitivity']],
+            'Specificity': [results_dict['KNN']['Specificity'], results_dict['LogisticRegression']['Specificity'],
+                            results_dict['DecisionTree']['Specificity'], results_dict['MLP']['Specificity'],
+                            results_dict['Bagging']['Specificity'], results_dict['AdaBoost']['Specificity'],
+                            results_dict['CNN']['Specificity'], results_dict['FeatureSelection']['Specificity']],
+            'Validation': ['2FCV', '2FCV', '2FCV', '2FCV', '2FCV', '2FCV', '2FCV', '2FCV'],
+            'Remarks': ['Worst Performance Overall', 'Bad Accuracy but decent Sensibility and Specificity',
+                        'Best Accuracy of the Supervised Models', 'Takes the most time to execute and has bad performance',
+                        'Improved the best supervised model the most', 'Improved the best model a little',
+                        'Best Sensitivity with decent Accuracy and Specificity', 'Best Specificity with decent Accuracy']
+        }
+
+        self.data_specifications = {
+            'Model': ['Model A', 'Model B', 'Model C', 'Model D', 'Model E', 'Model F', 'Model G', 'Model H'],
+            'Type': ['KNN', 'Logistic Regression', 'Decision Tree', 'MLP', 'Bagging of the Decision Tree',
+                     'AdaBoost of the Decision Tree', 'CNN', 'Decision Tree with Feature Selection'],
+            'Parameters': ['Number Neighbours: 3', 'C: 1.0, Penalty: l2', 'Max depth: None',
+                           'Neurons: 218, Activation: logistic', 'Model: Decision Tree', 'Model: Decision Tree',
+                           '8 layers without residual connection', 'Model: Decision Tree'],
+        }
+
+        # Convert data to DataFrames
+        self.df_results = pd.DataFrame(self.data_results)
+        self.df_specifications = pd.DataFrame(self.data_specifications)
+
+    def tables(self):
+        """
+        Print the results and specifications tables.
+        """
+
+        # Format columns for results table
+        self.df_results['Accuracy'] = self.df_results['Accuracy'].map('{:.2f}'.format)
+        self.df_results['Sensitivity'] = self.df_results['Sensitivity'].map('{:.2f}'.format)
+        self.df_results['Specificity'] = self.df_results['Specificity'].map('{:.2f}'.format)
+
+        # Create results table
+        results_table = pd.DataFrame({
+            'Model': self.df_results['Model'],
+            'Category': self.df_results['Category'],
+            'Accuracy': self.df_results['Accuracy'],
+            'Sensitivity': self.df_results['Sensitivity'],
+            'Specificity': self.df_results['Specificity'],
+            'Remarks': self.df_results['Remarks']
+        })
+
+        # Create specifications table
+        specifications_table = pd.DataFrame({
+            'Model': self.df_specifications['Model'],
+            'Type': self.df_specifications['Type'],
+            'Parameters': self.df_specifications['Parameters']
+        })
+
+        # Set display options
+        pd.set_option('display.max_rows', None)
+        pd.set_option('display.max_columns', None)
+
+        # Print results table
+        print("\nResults Table:\n")
+        print(results_table)
+        print()
+
+        # Print specifications table
+        print("\nSpecifications Table:\n")
+        print(specifications_table)
+
+        # Reset display options
+        pd.reset_option('display.max_rows')
+        pd.reset_option('display.max_columns')
 
 
 # %% 1- Pre Processing and EDA
@@ -2137,7 +2612,7 @@ print("Class distribution before resampling:")
 print(y_train_under.value_counts())
 
 # Resample the training data
-X_train, y_train = smote_enn.fit_resample(X_train_under, y_train_under)
+X_train, y_train = undersample.fit_resample(X_train_under, y_train_under)
 
 print("\nClass distribution after resampling:")
 print(y_train.value_counts())
@@ -2154,16 +2629,29 @@ models_dict = {
             "activation": ("tanh", "logistic", "relu")}
 }
 
+# Define the results dictionary
+results_dict = {
+    "KNN": {"Accuracy": 0.0, "Sensitivity": 0.0, "Specificity": 0.0},
+    "LogisticRegression": {"Accuracy": 0.0, "Sensitivity": 0.0, "Specificity": 0.0},
+    "DecisionTree": {"Accuracy": 0.0, "Sensitivity": 0.0, "Specificity": 0.0},
+    "MLP": {"Accuracy": 0.0, "Sensitivity": 0.0, "Specificity": 0.0},
+    "Bagging": {"Accuracy": 0.0, "Sensitivity": 0.0, "Specificity": 0.0},
+    "AdaBoost": {"Accuracy": 0.0, "Sensitivity": 0.0, "Specificity": 0.0},
+    "CNN": {"Accuracy": 0.0, "Sensitivity": 0.0, "Specificity": 0.0},
+    "FeatureSelection": {"Accuracy": 0.0, "Sensitivity": 0.0, "Specificity": 0.0}
+}
+
 # Initialize the ModelBuilding class with the training, testing and validation data
-builder = ModelBuilding(np.array(X_train), np.array(y_train), np.array(X_test), np.array(y_test), np.array(X_val), np.array(y_val))
+builder = ModelBuilding(np.array(X_train), np.array(y_train), np.array(X_test), np.array(y_test),
+                        np.array(X_val), np.array(y_val))
 
 # KNN Algorithm
-builder.build_models("KNN", models_dict)
+builder.build_models("KNN", models_dict, results_dict)
 
 # Supervised Learning Algorithms
-builder.build_models("LogisticRegression", models_dict)
-builder.build_models("DecisionTree", models_dict)
-builder.build_models("MLP", models_dict)
+builder.build_models("LogisticRegression", models_dict, results_dict)
+builder.build_models("DecisionTree", models_dict, results_dict)
+builder.build_models("MLP", models_dict, results_dict)
 
 # Serialize the builder object
 with open('builder.pkl', 'wb') as f:
@@ -2198,14 +2686,15 @@ bagging = BaggingClassifier(builder.best_model_checked(**builder.best_model_para
 # Examine the bagging ensemble
 bagging.examine_bagging()
 # Evaluate the bagging ensemble on the test set
-bagging.evaluate()
+bagging.evaluate(results_dict)
 
 # Initialize the AdaBoostClassifier class with the best model
-adaboost = AdaBoostClassifier(best_model_name, np.array(X_train), np.array(y_train), np.array(X_test), np.array(y_test), builder)
+adaboost = AdaBoostClassifier(best_model_name, np.array(X_train), np.array(y_train), np.array(X_test),
+                              np.array(y_test), builder)
 # Train the AdaBoost ensemble
 adaboost.train_adaboost()
 # Evaluate the AdaBoost ensemble on the test set
-adaboost.evaluate()
+adaboost.evaluate(results_dict)
 
 # Deep Learning Model
 
@@ -2228,9 +2717,7 @@ cnn.model.summary()
 history = cnn.train()
 
 # Evaluate the CNN model
-scores = cnn.evaluate()
-print("\nCNN Loss:", scores[0])
-print("CNN Accuracy:", scores[1])
+cnn.evaluate(results_dict)
 
 # Clustering Model
 
@@ -2238,3 +2725,27 @@ print("CNN Accuracy:", scores[1])
 clustering_model = ClusteringModel(X_train, X_test, 10)
 # Perform clustering and visualize the results
 clustering_model.perform_clustering()
+
+# Feature Selection
+
+# Initialize the BestFeatureSelector class with the training, testing and validation data
+feature_selector = BestFeatureSelector(X_train, y_train, X_test, y_test, X_val, y_val,
+                                       builder.best_model_checked(**builder.best_model_params_checked))
+# Select the best features
+feature_selector.select_features()
+
+# Serialize the feature_selector object
+with open('feature_selector.pkl', 'wb') as f:
+    pickle.dump(feature_selector, f)
+
+print("\nThe selected features were: ", feature_selector.selected_features_idx)
+
+# Evaluate the model with the selected features
+feature_selector.evaluate(results_dict)
+
+# Data Demonstration
+
+# Initialize the DataDemonstration class with the results dictionary
+demonstration = DataDemonstration(results_dict)
+# Print the results and specifications tables
+demonstration.tables()
